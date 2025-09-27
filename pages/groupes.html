@@ -1,0 +1,197 @@
+<style>
+    /* Utilise les variables de thème de main.html */
+    .groups-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        height: calc(100vh - 150px);
+        background-color: var(--bg-content);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .groups-list-panel {
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border-color);
+    }
+    .groups-header {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .create-group-btn {
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    #groupsContainer {
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+    .group-item {
+        padding: 15px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 500;
+    }
+    .group-item:hover, .group-item.active {
+        background-color: var(--bg-main);
+    }
+
+    .group-details-panel {
+        padding: 25px;
+    }
+    .group-details-panel h2 {
+        margin-top: 0;
+        color: var(--text-primary);
+    }
+    #groupMembersContainer {
+        margin-top: 20px;
+    }
+    .member-item {
+        padding: 8px 0;
+        color: var(--text-secondary);
+    }
+    .add-member-form {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+    }
+    .add-member-form select {
+        flex-grow: 1;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background-color: var(--bg-main);
+        color: var(--text-primary);
+    }
+</style>
+
+<div class="groups-layout">
+    <div class="groups-list-panel">
+        <div class="groups-header">
+            <h3>Vos Groupes</h3>
+            <button class="create-group-btn" id="createGroupBtn">Créer +</button>
+        </div>
+        <div id="groupsContainer"></div>
+    </div>
+    <div class="group-details-panel" id="groupDetailsPanel" style="display: none;">
+        <h2 id="groupName"></h2>
+        <h4>Membres</h4>
+        <div id="groupMembersContainer"></div>
+        <form class="add-member-form" id="addMemberForm">
+            <select id="userSelect"></select>
+            <button type="submit" class="create-group-btn">Ajouter</button>
+        </form>
+    </div>
+</div>
+
+<script>
+(async function() {
+    if (!currentUser) return;
+
+    // --- DOM Elements ---
+    const createGroupBtn = document.getElementById('createGroupBtn');
+    const groupsContainer = document.getElementById('groupsContainer');
+    const groupDetailsPanel = document.getElementById('groupDetailsPanel');
+    const groupNameDisplay = document.getElementById('groupName');
+    const groupMembersContainer = document.getElementById('groupMembersContainer');
+    const addMemberForm = document.getElementById('addMemberForm');
+    const userSelect = document.getElementById('userSelect');
+    
+    // --- State Management ---
+    let allUsers = [];
+    let currentGroups = [];
+    let selectedGroupId = null;
+    
+    // --- Fonctions Principales ---
+    const renderGroups = () => {
+        groupsContainer.innerHTML = currentGroups.map(g => `
+            <div class="group-item" data-id="${g.id}" data-name="${g.name}">
+                ${g.name}
+            </div>
+        `).join('');
+    };
+    
+    const loadGroupDetails = async (groupId, groupName) => {
+        selectedGroupId = groupId;
+        groupNameDisplay.textContent = groupName;
+        groupDetailsPanel.style.display = 'block';
+        
+        // Charger les membres du groupe
+        const { data: members, error } = await supabaseClient
+            .from('group_members')
+            .select(`profiles (id, email)`)
+            .eq('group_id', groupId);
+        
+        if (error) { console.error(error); return; }
+        
+        groupMembersContainer.innerHTML = members.map(m => `<div class="member-item">${m.profiles.email}</div>`).join('');
+        
+        // Préparer la liste des utilisateurs à ajouter
+        const memberIds = members.map(m => m.profiles.id);
+        const usersToAdd = allUsers.filter(u => !memberIds.includes(u.id));
+        userSelect.innerHTML = usersToAdd.map(u => `<option value="${u.id}">${u.email}</option>`).join('');
+    };
+
+    const fetchGroups = async () => {
+        const { data, error } = await supabaseClient.from('groups').select('*');
+        if (error) { console.error("Erreur de chargement des groupes:", error); return; }
+        currentGroups = data;
+        renderGroups();
+    };
+
+    // --- Event Listeners ---
+    createGroupBtn.addEventListener('click', async () => {
+        const name = prompt("Entrez le nom du nouveau groupe :");
+        if (name) {
+            const { error } = await supabaseClient.from('groups').insert({
+                name: name,
+                created_by: currentUser.id
+            });
+            if (error) { alert("Erreur lors de la création du groupe."); console.error(error); }
+            else { await fetchGroups(); }
+        }
+    });
+
+    groupsContainer.addEventListener('click', (e) => {
+        const groupItem = e.target.closest('.group-item');
+        if (groupItem) {
+            document.querySelectorAll('.group-item.active').forEach(el => el.classList.remove('active'));
+            groupItem.classList.add('active');
+            loadGroupDetails(groupItem.dataset.id, groupItem.dataset.name);
+        }
+    });
+    
+    addMemberForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userIdToAdd = userSelect.value;
+        if (!userIdToAdd || !selectedGroupId) return;
+        
+        const { error } = await supabaseClient.from('group_members').insert({
+            group_id: selectedGroupId,
+            user_id: userIdToAdd
+        });
+        
+        if (error) { alert("Erreur lors de l'ajout du membre."); console.error(error); }
+        else {
+            // Recharger les détails pour mettre à jour la liste des membres
+            const selectedGroup = currentGroups.find(g => g.id == selectedGroupId);
+            await loadGroupDetails(selectedGroupId, selectedGroup.name);
+        }
+    });
+
+    // --- Initialisation ---
+    // Charger tous les utilisateurs pour le sélecteur d'ajout
+    const { data: users } = await supabaseClient.from('profiles').select('*');
+    if (users) { allUsers = users; }
+
+    await fetchGroups();
+})();
+</script>
