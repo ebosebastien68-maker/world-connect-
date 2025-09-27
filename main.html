@@ -3,709 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World Web - Administration</title>
+    <title>World Web - Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --font-family: 'Inter', sans-serif; 
-            --transition-speed: 0.2s; 
-            --bg-main: #f0f2f5; 
-            --bg-navbar: #ffffff; 
-            --bg-content: #ffffff; 
-            --text-primary: #1c1e21; 
-            --text-secondary: #65676b; 
-            --border-color: #e0e0e0; 
-            --accent-color: #0d6efd; 
-            --shadow-color: rgba(0, 0, 0, 0.05);
-            --hover-bg: #e9ebee;
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            --transition-speed: 0.3s;
+            --bg-main: #f8fafc; --bg-navbar: #ffffff; --bg-content: #ffffff; --bg-card: #ffffff;
+            --text-primary: #1e293b; --text-secondary: #64748b; --text-muted: #94a3b8;
+            --border-color: #e2e8f0; --border-radius: 12px;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --accent-color: #3b82f6; --accent-hover: #2563eb;
+            --success-color: #10b981; --error-color: #ef4444;
+            --hover-bg: #f1f5f9;
         }
-        
         body.dark-theme {
-            --bg-main: #18191a; 
-            --bg-navbar: #242526; 
-            --bg-content: #242526; 
-            --text-primary: #e4e6eb; 
-            --text-secondary: #b0b3b8; 
-            --border-color: #3a3b3c; 
-            --accent-color: #4dabf7; 
-            --shadow-color: rgba(0, 0, 0, 0.2);
-            --hover-bg: #3a3b3c;
+            --bg-main: #0f172a; --bg-navbar: #1e293b; --bg-content: #1e293b; --bg-card: #334155;
+            --text-primary: #f1f5f9; --text-secondary: #cbd5e1; --text-muted: #94a3b8;
+            --border-color: #475569; --accent-color: #60a5fa; --accent-hover: #3b82f6;
+            --hover-bg: #475569;
         }
-
-        * { 
-            box-sizing: border-box; 
-        }
-        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
-            font-family: var(--font-family);
-            margin: 0; 
-            background-color: var(--bg-main);
-            color: var(--text-primary);
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh;
-            overflow: hidden;
-            transition: all var(--transition-speed);
+            font-family: var(--font-family); background-color: var(--bg-main); color: var(--text-primary);
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            transition: all var(--transition-speed) ease;
         }
-        
         .navbar {
-            background-color: var(--bg-navbar);
-            padding: 15px;
-            box-shadow: 0 2px 4px var(--shadow-color);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 10px;
-            flex-shrink: 0;
+            background-color: var(--bg-navbar); padding: 16px 24px; box-shadow: var(--shadow-md);
+            border-bottom: 1px solid var(--border-color); display: flex; align-items: center;
+            justify-content: space-between; flex-shrink: 0;
         }
-        
-        .navbar-left {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+        .navbar-left { display: flex; align-items: center; gap: 24px; }
+        .navbar-title { font-size: 1.5rem; font-weight: 700; color: var(--accent-color); }
+        .page-title { font-size: 1.75rem; font-weight: 600; color: var(--text-primary); margin: 0; }
+        .navbar-right { display: flex; align-items: center; gap: 20px; }
+        .nav-links { display: flex; gap: 8px; align-items: center; }
+        .nav-link {
+            color: var(--text-secondary); padding: 12px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; width: 48px; height: 48px;
+            transition: all var(--transition-speed) ease; cursor: pointer; position: relative;
         }
-        
-        .navbar-title {
-            font-size: 1.5em;
-            font-weight: 700;
-            color: var(--accent-color);
-        }
-        
-        .page-title {
-            font-size: 1.8em;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
-        
-        .navbar-right {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        
-        .nav-links {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .nav-links a {
-            text-decoration: none;
-            color: var(--text-secondary);
-            padding: 10px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            transition: all var(--transition-speed);
-        }
-        
-        .nav-links a.active {
-            background-color: var(--accent-color);
-            color: white;
-        }
-        
-        .nav-links a:hover:not(.active) {
-            background-color: var(--hover-bg);
-            color: var(--text-primary);
-        }
-        
-        .nav-links svg {
-            width: 24px;
-            height: 24px;
-        }
-        
-        .theme-toggle {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 8px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all var(--transition-speed);
-        }
-        
-        .theme-toggle:hover {
-            background-color: var(--hover-bg);
-            color: var(--text-primary);
-        }
-        
-        .theme-toggle svg {
-            width: 24px;
-            height: 24px;
-        }
-        
-        #app-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 25px;
-            background-color: var(--bg-content);
-        }
-        
-        .preloaded-page {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-        
-        @keyframes fadeIn { 
-            from { 
-                opacity: 0; 
-                transform: translateY(10px); 
-            } 
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            } 
-        }
-        
-        .loader { 
-            text-align: center; 
-            padding: 50px; 
-            font-size: 1.5em; 
-            color: var(--text-secondary);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .navbar {
-                padding: 10px 15px;
-            }
-            
-            .navbar-left {
-                gap: 15px;
-            }
-            
-            .page-title {
-                font-size: 1.4em;
-            }
-            
-            .navbar-title {
-                font-size: 1.3em;
-            }
-            
-            #app-content {
-                padding: 15px;
-            }
-        }
+        .nav-link:hover:not(.active) { background-color: var(--hover-bg); color: var(--text-primary); transform: translateY(-2px); }
+        .nav-link.active { background-color: var(--accent-color); color: white; box-shadow: var(--shadow-md); }
+        .nav-link svg { width: 24px; height: 24px; }
+        .theme-toggle { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 10px; border-radius: 50%; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; transition: all var(--transition-speed) ease; }
+        .theme-toggle:hover { background-color: var(--hover-bg); color: var(--text-primary); transform: rotate(15deg); }
+        #app-content { flex: 1; overflow-y: auto; padding: 32px; background-color: var(--bg-content); }
+        .preloaded-page { display: none; animation: fadeIn 0.4s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; }
+        .loader-spinner { width: 40px; height: 40px; border: 3px solid var(--border-color); border-top: 3px solid var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <nav class="navbar">
         <div class="navbar-left">
-            <div class="navbar-title">World Web</div>
+            <div class="navbar-title">🌍 World Web</div>
             <h1 class="page-title" id="page-title">Accueil</h1>
         </div>
-        
         <div class="navbar-right">
             <div class="nav-links">
-                <a href="#home" class="nav-link active" title="Accueil">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                    </svg>
-                </a>
-                <a href="#messages" class="nav-link" title="Messages">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path>
-                    </svg>
-                </a>
-                <a href="#groupes" class="nav-link" title="Groupes">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path>
-                    </svg>
-                </a>
-                <a href="#publier" class="nav-link" title="Publier">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                </a>
-                <a href="#notifications" class="nav-link" title="Notifications">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"></path>
-                    </svg>
-                </a>
-                <a href="#menu" class="nav-link" title="Menu">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </a>
+                <div class="nav-link active" data-page="home" title="Accueil"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg></div>
+                <div class="nav-link" data-page="messages" title="Messages"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg></div>
+                <div class="nav-link" data-page="groupes" title="Groupes"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></svg></div>
+                <div class="nav-link" data-page="publier" title="Publier"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                <div class="nav-link" data-page="notifications" title="Notifications"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"></path></svg></div>
+                <div class="nav-link" data-page="menu" title="Menu"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg></div>
             </div>
-            
-            <button class="theme-toggle" id="themeToggle" title="Changer de thème">
-                <svg id="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                </svg>
-            </button>
+            <button class="theme-toggle" id="themeToggle" title="Changer de thème"><svg id="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg></button>
         </div>
     </nav>
 
     <main id="app-content">
-        <div class="loader">Chargement de l'application...</div>
+        <div class="loader">
+            <div class="loader-spinner"></div>
+            <p>Chargement de l'application...</p>
+        </div>
     </main>
 
     <script>
         // --- CONFIGURATION SUPABASE ---
         const SUPABASE_URL = 'https://nmqzrouoeopanloskkvi.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
-        
         const { createClient } = supabase;
-        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            realtime: {
-                params: {
-                    eventsPerSecond: 10
-                }
-            }
-        });
-        
-        // Variables globales
-        let currentUser = null;
-        let currentUserProfile = null;
-        let realtimeSubscriptions = [];
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Éléments DOM
+        // --- VARIABLES GLOBALES ---
+        let currentUser = null;
+        let currentUserProfile = null; // Pour stocker le profil complet (avec le rôle)
         const appContent = document.getElementById('app-content');
         const navLinks = document.querySelectorAll('.nav-link');
         const pageTitle = document.getElementById('page-title');
         const pagesToPreload = ['home', 'messages', 'groupes', 'publier', 'notifications', 'menu'];
 
-        // --- FONCTIONS D'API SUPABASE ---
-
-        // Récupérer le profil utilisateur
-        const getUserProfile = async (userId) => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .single();
-                
-                if (error) throw error;
-                return data;
-            } catch (error) {
-                console.error('Erreur lors de la récupération du profil:', error);
-                return null;
-            }
-        };
-
-        // Récupérer tous les posts avec leurs données liées
-        const getAllPosts = async () => {
-            try {
-                const { data: posts, error } = await supabaseClient
-                    .from('posts')
-                    .select(`
-                        *,
-                        profiles:user_id (
-                            id,
-                            email,
-                            avatar_url
-                        ),
-                        post_images (
-                            id,
-                            image_url
-                        ),
-                        post_whatsapp_numbers (
-                            id,
-                            whatsapp_number
-                        ),
-                        post_custom_links (
-                            id,
-                            title,
-                            url
-                        ),
-                        reactions (
-                            id,
-                            reaction_type,
-                            user_id
-                        ),
-                        comments (
-                            id,
-                            content,
-                            created_at,
-                            profiles:user_id (
-                                id,
-                                email
-                            )
-                        )
-                    `)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                return posts || [];
-            } catch (error) {
-                console.error('Erreur lors du chargement des posts:', error);
-                return [];
-            }
-        };
-
-        // Créer un nouveau post
-        const createPost = async (postData) => {
-            try {
-                const { data: post, error } = await supabaseClient
-                    .from('posts')
-                    .insert([{
-                        user_id: currentUser.id,
-                        content: postData.content,
-                        media_url: postData.media_url,
-                        buy_link: postData.buy_link
-                    }])
-                    .select()
-                    .single();
-
-                if (error) throw error;
-
-                // Ajouter les images si présentes
-                if (postData.images && postData.images.length > 0) {
-                    const imageInserts = postData.images.map(imageUrl => ({
-                        post_id: post.id,
-                        image_url: imageUrl
-                    }));
-                    
-                    const { error: imageError } = await supabaseClient
-                        .from('post_images')
-                        .insert(imageInserts);
-                    
-                    if (imageError) console.error('Erreur lors de l\'ajout des images:', imageError);
-                }
-
-                // Ajouter les numéros WhatsApp si présents
-                if (postData.whatsapp_numbers && postData.whatsapp_numbers.length > 0) {
-                    const whatsappInserts = postData.whatsapp_numbers.map(number => ({
-                        post_id: post.id,
-                        whatsapp_number: number
-                    }));
-                    
-                    const { error: whatsappError } = await supabaseClient
-                        .from('post_whatsapp_numbers')
-                        .insert(whatsappInserts);
-                    
-                    if (whatsappError) console.error('Erreur lors de l\'ajout des numéros WhatsApp:', whatsappError);
-                }
-
-                // Ajouter les liens personnalisés si présents
-                if (postData.custom_links && postData.custom_links.length > 0) {
-                    const linkInserts = postData.custom_links.map(link => ({
-                        post_id: post.id,
-                        title: link.title,
-                        url: link.url
-                    }));
-                    
-                    const { error: linkError } = await supabaseClient
-                        .from('post_custom_links')
-                        .insert(linkInserts);
-                    
-                    if (linkError) console.error('Erreur lors de l\'ajout des liens:', linkError);
-                }
-
-                return post;
-            } catch (error) {
-                console.error('Erreur lors de la création du post:', error);
-                return null;
-            }
-        };
-
-        // Ajouter une réaction à un post
-        const addReaction = async (postId, reactionType) => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('reactions')
-                    .upsert([{
-                        post_id: postId,
-                        user_id: currentUser.id,
-                        reaction_type: reactionType
-                    }])
-                    .select();
-
-                if (error) throw error;
-                return data;
-            } catch (error) {
-                console.error('Erreur lors de l\'ajout de la réaction:', error);
-                return null;
-            }
-        };
-
-        // Ajouter un commentaire à un post
-        const addComment = async (postId, content, parentCommentId = null) => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('comments')
-                    .insert([{
-                        post_id: postId,
-                        user_id: currentUser.id,
-                        content: content,
-                        parent_comment_id: parentCommentId
-                    }])
-                    .select(`
-                        *,
-                        profiles:user_id (
-                            id,
-                            email
-                        )
-                    `)
-                    .single();
-
-                if (error) throw error;
-                return data;
-            } catch (error) {
-                console.error('Erreur lors de l\'ajout du commentaire:', error);
-                return null;
-            }
-        };
-
-        // Récupérer les messages
-        const getMessages = async () => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('messages')
-                    .select(`
-                        *,
-                        sender:sender_id (
-                            id,
-                            email
-                        ),
-                        receiver:receiver_id (
-                            id,
-                            email
-                        )
-                    `)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                return data || [];
-            } catch (error) {
-                console.error('Erreur lors du chargement des messages:', error);
-                return [];
-            }
-        };
-
-        // Envoyer un message
-        const sendMessage = async (receiverId, content) => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('messages')
-                    .insert([{
-                        sender_id: currentUser.id,
-                        receiver_id: receiverId,
-                        content: content
-                    }])
-                    .select(`
-                        *,
-                        sender:sender_id (
-                            id,
-                            email
-                        ),
-                        receiver:receiver_id (
-                            id,
-                            email
-                        )
-                    `)
-                    .single();
-
-                if (error) throw error;
-                return data;
-            } catch (error) {
-                console.error('Erreur lors de l\'envoi du message:', error);
-                return null;
-            }
-        };
-
-        // Récupérer les groupes
-        const getGroups = async () => {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('groups')
-                    .select(`
-                        *,
-                        creator:created_by (
-                            id,
-                            email
-                        ),
-                        group_members (
-                            user_id,
-                            joined_at,
-                            profiles:user_id (
-                                id,
-                                email
-                            )
-                        )
-                    `)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-                return data || [];
-            } catch (error) {
-                console.error('Erreur lors du chargement des groupes:', error);
-                return [];
-            }
-        };
-
-        // --- GESTION DES PAGES ---
-
-        // Fonction pour afficher une page
-        const showPage = (page) => {
+        // --- FONCTIONS DE L'APPLICATION ---
+        const showPage = (pageName) => {
             document.querySelectorAll('.preloaded-page').forEach(p => p.style.display = 'none');
-            const activePage = document.getElementById(`page-${page}`);
+            const activePage = document.getElementById(`page-${pageName}`);
             if (activePage) activePage.style.display = 'block';
-            
+
             navLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.href.includes(page)) {
-                    link.classList.add('active');
-                    pageTitle.textContent = link.title;
-                }
+                const isActive = link.dataset.page === pageName;
+                link.classList.toggle('active', isActive);
+                if(isActive) pageTitle.textContent = link.title;
             });
         };
         
-        // Gestion des changements de route
-        const handleRouteChange = () => {
-            const page = window.location.hash.substring(1) || 'home';
-            showPage(page);
-        };
-        
-        // Préchargement de toutes les pages
         const preloadAllPages = async () => {
             appContent.innerHTML = '';
-            
-            // Charger toutes les pages en parallèle pour plus de rapidité
-            const loadPromises = pagesToPreload.map(async (pageName) => {
+            for (const pageName of pagesToPreload) {
                 try {
                     const response = await fetch(`./pages/${pageName}.html`);
-                    if (response.ok) {
-                        const html = await response.text();
-                        const pageContainer = document.createElement('div');
-                        pageContainer.id = `page-${pageName}`;
-                        pageContainer.classList.add('preloaded-page');
-                        pageContainer.innerHTML = html;
-                        appContent.appendChild(pageContainer);
-                        return { success: true, page: pageName };
-                    } else {
-                        throw new Error(`Page non trouvée: ${pageName}`);
-                    }
-                } catch(error) { 
-                    console.error(`Erreur de préchargement pour ${pageName}:`, error);
-                    return { success: false, page: pageName };
-                }
-            });
-
-            // Attendre que toutes les pages tentent de se charger
-            await Promise.allSettled(loadPromises);
+                    if (!response.ok) throw new Error(`Page non trouvée: ${pageName}`);
+                    const html = await response.text();
+                    const pageContainer = document.createElement('div');
+                    pageContainer.id = `page-${pageName}`;
+                    pageContainer.classList.add('preloaded-page');
+                    pageContainer.innerHTML = html;
+                    appContent.appendChild(pageContainer);
+                } catch(e) { console.error(e); }
+            }
         };
 
-        // --- INITIALISATION ---
-
-        // Initialisation de l'application
         const initializeApp = async () => {
-            // 1. Précharger les pages immédiatement (frontend d'abord)
             await preloadAllPages();
-            
-            // 2. Exécuter les scripts des pages chargées
             document.querySelectorAll('.preloaded-page script').forEach(script => {
-                try {
-                    const newScript = document.createElement('script');
-                    newScript.textContent = script.textContent;
-                    document.body.appendChild(newScript).remove();
-                } catch (error) {
-                    console.warn('Erreur script:', error);
-                }
+                const newScript = document.createElement('script');
+                newScript.textContent = script.textContent;
+                document.body.appendChild(newScript).remove();
             });
-            
-            // 3. Activer la navigation immédiatement
-            window.addEventListener('hashchange', handleRouteChange);
-            handleRouteChange();
-            
-            // 4. Charger les données backend en arrière-plan (ne bloque pas l'interface)
-            loadBackendData();
+            showPage('home'); // Affiche la page d'accueil par défaut
         };
-
-        // Chargement des données backend en arrière-plan
-        const loadBackendData = async () => {
-            try {
-                // Récupérer le profil utilisateur en arrière-plan
-                currentUserProfile = await getUserProfile(currentUser.id);
-                
-                // Exposer les fonctions globalement pour les pages
-                window.worldWebAPI = {
-                    supabaseClient,
-                    currentUser,
-                    currentUserProfile,
-                    getAllPosts,
-                    createPost,
-                    addReaction,
-                    addComment,
-                    getMessages,
-                    sendMessage,
-                    getGroups,
-                    getUserProfile,
-                    realtimeSubscriptions
-                };
-                
-                console.log('Données backend chargées');
-            } catch (error) {
-                console.warn('Erreur backend (interface reste fonctionnelle):', error);
-                // L'interface continue de fonctionner même si le backend échoue
-            }
-        };
-
-        // Initialisation au chargement de la page
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                // Gestion du thème sauvegardé
-                const savedTheme = localStorage.getItem('theme') || 'light';
-                document.body.classList.toggle('dark-theme', savedTheme === 'dark');
-
-                // Vérification de la session utilisateur
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session) { 
-                    window.location.href = 'index.html';
-                    return; 
-                }
-                
-                // Lancement de l'application pour tout utilisateur connecté
-                currentUser = session.user;
-                await initializeApp();
-            } catch (error) {
-                console.error('Erreur lors de l\'initialisation:', error);
-            }
-        });
-
-        // Gestion de la déconnexion et nettoyage
-        window.addEventListener('beforeunload', () => {
-            // Nettoyer les abonnements realtime
-            realtimeSubscriptions.forEach(subscription => {
-                if (subscription && typeof subscription.unsubscribe === 'function') {
-                    try {
-                        subscription.unsubscribe();
-                    } catch (e) {
-                        console.warn('Erreur lors de la déconnexion:', e);
-                    }
-                }
-            });
-            realtimeSubscriptions = [];
-        });
-
-        // --- GESTION DU THÈME ---
-
-        const themeToggle = document.getElementById('themeToggle');
-        const themeIcon = document.getElementById('theme-icon');
         
+        // --- GESTION DU THÈME ---
+        const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             const isDark = document.body.classList.toggle('dark-theme');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+
+        // --- POINT D'ENTRÉE DE L'APPLICATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { 
+                window.location.href = 'index.html';
+                return; 
+            }
+            currentUser = session.user;
             
-            // Changer l'icône selon le thème
-            if (isDark) {
-                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>';
-            } else {
-                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>';
+            // On récupère aussi le profil pour connaître le rôle
+            const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
+            currentUserProfile = profile;
+
+            await initializeApp();
+        });
+
+        // --- GESTION DE LA NAVIGATION ---
+        document.querySelector('.nav-links').addEventListener('click', (e) => {
+            const navLink = e.target.closest('.nav-link');
+            if (navLink) {
+                const page = navLink.dataset.page;
+                showPage(page);
             }
         });
     </script>
