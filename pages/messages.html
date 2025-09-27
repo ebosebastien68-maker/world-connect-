@@ -1,0 +1,220 @@
+<style>
+    /* Utilise les variables de thème de main.html */
+    .messages-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        height: calc(100vh - 150px); /* Ajuster la hauteur pour l'affichage */
+        background-color: var(--bg-content);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    /* --- Panneau de gauche (Liste des utilisateurs) --- */
+    .users-list {
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border-color);
+    }
+    .search-bar { padding: 15px; border-bottom: 1px solid var(--border-color); }
+    .search-bar input {
+        width: 100%; padding: 10px 15px; border-radius: 20px;
+        border: none; background-color: var(--bg-main); color: var(--text-primary);
+    }
+    #usersContainer { flex-grow: 1; overflow-y: auto; }
+    .user-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 15px; cursor: pointer;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .user-item:hover, .user-item.active { background-color: var(--bg-main); }
+
+    /* --- Panneau de droite (Fenêtre de chat) --- */
+    .chat-window { display: flex; flex-direction: column; }
+    .chat-header {
+        padding: 15px 20px; border-bottom: 1px solid var(--border-color);
+        font-weight: 600; color: var(--text-primary); flex-shrink: 0;
+    }
+    #messagesContainer {
+        flex-grow: 1; padding: 20px; overflow-y: auto;
+        display: flex; flex-direction: column;
+    }
+    .message-bubble {
+        max-width: 70%; padding: 10px 15px; border-radius: 18px;
+        margin-bottom: 10px; line-height: 1.4;
+    }
+    .message-bubble.sent {
+        background-color: var(--accent-color); color: white;
+        align-self: flex-end; border-bottom-right-radius: 4px;
+    }
+    .message-bubble.received {
+        background-color: var(--hover-background); color: var(--text-primary);
+        align-self: flex-start; border-bottom-left-radius: 4px;
+    }
+    .message-bubble img { max-width: 100%; border-radius: 10px; margin-top: 5px; }
+
+    /* --- Formulaire d'envoi de message --- */
+    .message-form {
+        display: flex; align-items: center; gap: 10px;
+        padding: 15px; border-top: 1px solid var(--border-color);
+        flex-shrink: 0;
+    }
+    .message-form input[type="text"] {
+        flex-grow: 1; padding: 12px 18px; border-radius: 22px;
+        border: none; background-color: var(--bg-main); color: var(--text-primary);
+    }
+    .message-form button {
+        background: none; border: none; cursor: pointer; color: var(--accent-color);
+        padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .message-form button:hover { background-color: var(--hover-background); }
+    .message-form input[type="file"] { display: none; }
+</style>
+
+<div class="messages-layout">
+    <div class="users-list">
+        <div class="search-bar">
+            <input type="text" id="userSearch" placeholder="Chercher un utilisateur...">
+        </div>
+        <div id="usersContainer"></div>
+    </div>
+    <div class="chat-window">
+        <div class="chat-header" id="chatHeader">Sélectionnez une conversation</div>
+        <div id="messagesContainer"></div>
+        <form class="message-form" id="messageForm">
+            <label for="mediaInput" class="media-btn">
+                <button type="button" onclick="document.getElementById('mediaInput').click();" title="Importer un média">
+                    <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M21.586 10.414l-8-8A2 2 0 0012 2H4a2 2 0 00-2 2v16a2 2 0 002 2h16a2 2 0 002-2V12a2 2 0 00-.414-1.586zM12 4.414L19.586 12H12V4.414zM4 20V4h6v8a2 2 0 002 2h8v6H4z"></path></svg>
+                </button>
+            </label>
+            <input type="file" id="mediaInput" accept="image/*,video/*">
+            <input type="text" id="messageInput" placeholder="Écrire un message..." required autocomplete="off">
+            <button type="submit" title="Envoyer">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+(async function() {
+    if (!currentUser) return;
+
+    // --- DOM Elements ---
+    const usersContainer = document.getElementById('usersContainer');
+    const userSearch = document.getElementById('userSearch');
+    const chatHeader = document.getElementById('chatHeader');
+    const messagesContainer = document.getElementById('messagesContainer');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const mediaInput = document.getElementById('mediaInput');
+
+    // --- State Management ---
+    let allProfiles = [];
+    let currentRecipientId = null;
+    let messageSubscription = null;
+
+    const scrollToBottom = () => { messagesContainer.scrollTop = messagesContainer.scrollHeight; };
+
+    // --- Fonctions Principales ---
+    const renderProfiles = (filter = '') => {
+        const filtered = allProfiles.filter(p => p.email.toLowerCase().includes(filter.toLowerCase()));
+        usersContainer.innerHTML = filtered.map(p => `
+            <div class="user-item" data-id="${p.id}" data-email="${p.email}">
+                ${p.email}
+            </div>
+        `).join('');
+    };
+    
+    const loadMessages = async (recipientId) => {
+        if (messageSubscription) {
+            supabaseClient.removeChannel(messageSubscription);
+        }
+        currentRecipientId = recipientId;
+        const recipient = allProfiles.find(p => p.id === recipientId);
+        chatHeader.textContent = `Discussion avec ${recipient.email}`;
+        messagesContainer.innerHTML = '<div class="loader">Chargement...</div>';
+
+        const { data: messages, error } = await supabaseClient
+            .from('messages')
+            .select('*')
+            .or(`(sender_id.eq.${currentUser.id},receiver_id.eq.${recipientId}),(sender_id.eq.${recipientId},receiver_id.eq.${currentUser.id})`)
+            .order('created_at', { ascending: true });
+
+        if (error) { messagesContainer.innerHTML = 'Erreur de chargement.'; return; }
+
+        messagesContainer.innerHTML = messages.map(msg => `
+            <div class="message-bubble ${msg.sender_id === currentUser.id ? 'sent' : 'received'}">
+                ${msg.content || ''}
+                ${msg.media_url ? `<img src="${msg.media_url}" alt="Média partagé">` : ''}
+            </div>
+        `).join('');
+        scrollToBottom();
+
+        // Activer le temps réel
+        messageSubscription = supabaseClient.channel(`messages-to-${currentUser.id}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                const newMessage = payload.new;
+                // Ajouter le nouveau message seulement si c'est pour cette conversation
+                if ((newMessage.sender_id === currentUser.id && newMessage.receiver_id === currentRecipientId) || 
+                    (newMessage.sender_id === currentRecipientId && newMessage.receiver_id === currentUser.id)) {
+                    messagesContainer.innerHTML += `
+                        <div class="message-bubble ${newMessage.sender_id === currentUser.id ? 'sent' : 'received'}">
+                            ${newMessage.content || ''}
+                            ${newMessage.media_url ? `<img src="${newMessage.media_url}" alt="Média partagé">` : ''}
+                        </div>`;
+                    scrollToBottom();
+                }
+            })
+            .subscribe();
+    };
+
+    // --- Event Listeners ---
+    userSearch.addEventListener('input', () => renderProfiles(userSearch.value));
+
+    usersContainer.addEventListener('click', (e) => {
+        const userItem = e.target.closest('.user-item');
+        if (userItem) {
+            document.querySelectorAll('.user-item.active').forEach(el => el.classList.remove('active'));
+            userItem.classList.add('active');
+            loadMessages(userItem.dataset.id);
+        }
+    });
+
+    messageForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!messageInput.value || !currentRecipientId) return;
+        const content = messageInput.value;
+        messageInput.value = '';
+        await supabaseClient.from('messages').insert({
+            sender_id: currentUser.id,
+            receiver_id: currentRecipientId,
+            content: content
+        });
+    });
+
+    mediaInput.addEventListener('change', async () => {
+        const file = mediaInput.files[0];
+        if (!file || !currentRecipientId) return;
+
+        const filePath = `public/${currentUser.id}/messages/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabaseClient.storage.from('media').upload(filePath, file);
+
+        if (uploadError) { alert("Erreur d'upload."); console.error(uploadError); return; }
+        
+        const { data } = supabaseClient.storage.from('media').getPublicUrl(filePath);
+        await supabaseClient.from('messages').insert({
+            sender_id: currentUser.id,
+            receiver_id: currentRecipientId,
+            media_url: data.publicUrl
+        });
+    });
+
+    // --- Initialisation ---
+    const { data: profiles, error } = await supabaseClient.from('profiles').select('*').neq('id', currentUser.id);
+    if (profiles) {
+        allProfiles = profiles;
+        renderProfiles();
+    }
+})();
+      </script>
+      
