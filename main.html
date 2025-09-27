@@ -175,24 +175,6 @@
             color: var(--text-secondary);
         }
 
-        .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 1px solid #f5c6cb;
-        }
-
-        .success-message {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            border: 1px solid #c3e6cb;
-        }
-
         /* Responsive */
         @media (max-width: 768px) {
             .navbar {
@@ -289,37 +271,6 @@
         const pageTitle = document.getElementById('page-title');
         const pagesToPreload = ['home', 'messages', 'groupes', 'publier', 'notifications', 'menu'];
 
-        // --- FONCTIONS UTILITAIRES ---
-
-        // Fonction pour afficher les erreurs
-        const showError = (message) => {
-            console.error('Erreur:', message);
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = message;
-            appContent.insertBefore(errorDiv, appContent.firstChild);
-            
-            setTimeout(() => {
-                if (errorDiv.parentNode) {
-                    errorDiv.parentNode.removeChild(errorDiv);
-                }
-            }, 5000);
-        };
-
-        // Fonction pour afficher les messages de succès
-        const showSuccess = (message) => {
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.textContent = message;
-            appContent.insertBefore(successDiv, appContent.firstChild);
-            
-            setTimeout(() => {
-                if (successDiv.parentNode) {
-                    successDiv.parentNode.removeChild(successDiv);
-                }
-            }, 3000);
-        };
-
         // --- FONCTIONS D'API SUPABASE ---
 
         // Récupérer le profil utilisateur
@@ -385,7 +336,6 @@
                 return posts || [];
             } catch (error) {
                 console.error('Erreur lors du chargement des posts:', error);
-                showError('Impossible de charger les publications');
                 return [];
             }
         };
@@ -452,7 +402,6 @@
                 return post;
             } catch (error) {
                 console.error('Erreur lors de la création du post:', error);
-                showError('Impossible de créer la publication');
                 return null;
             }
         };
@@ -501,7 +450,6 @@
                 return data;
             } catch (error) {
                 console.error('Erreur lors de l\'ajout du commentaire:', error);
-                showError('Impossible d\'ajouter le commentaire');
                 return null;
             }
         };
@@ -558,4 +506,57 @@
                 if (error) throw error;
                 return data;
             } catch (error) {
-                console.error('Erreur 
+                console.error('Erreur lors de l\'envoi du message:', error);
+                return null;
+            }
+        };
+
+        // Récupérer les groupes
+        const getGroups = async () => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('groups')
+                    .select(`
+                        *,
+                        creator:created_by (
+                            id,
+                            email
+                        ),
+                        group_members (
+                            user_id,
+                            joined_at,
+                            profiles:user_id (
+                                id,
+                                email
+                            )
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                return data || [];
+            } catch (error) {
+                console.error('Erreur lors du chargement des groupes:', error);
+                return [];
+            }
+        };
+
+        // --- GESTION DES PAGES ---
+
+        // Fonction pour afficher une page
+        const showPage = (page) => {
+            document.querySelectorAll('.preloaded-page').forEach(p => p.style.display = 'none');
+            const activePage = document.getElementById(`page-${page}`);
+            if (activePage) activePage.style.display = 'block';
+            
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.href.includes(page)) {
+                    link.classList.add('active');
+                    pageTitle.textContent = link.title;
+                }
+            });
+        };
+        
+        // Gestion des changements de route
+     
