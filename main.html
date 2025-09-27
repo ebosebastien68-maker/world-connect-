@@ -259,11 +259,18 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
         
         const { createClient } = supabase;
-        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            realtime: {
+                params: {
+                    eventsPerSecond: 10
+                }
+            }
+        });
         
         // Variables globales
         let currentUser = null;
         let currentUserProfile = null;
+        let realtimeSubscriptions = [];
 
         // Éléments DOM
         const appContent = document.getElementById('app-content');
@@ -559,4 +566,148 @@
         };
         
         // Gestion des changements de route
-     
+        const handleRouteChange = () => {
+            const page = window.location.hash.substring(1) || 'home';
+            showPage(page);
+        };
+        
+        // Préchargement de toutes les pages
+        const preloadAllPages = async () => {
+            appContent.innerHTML = '';
+            
+            // Charger toutes les pages en parallèle pour plus de rapidité
+            const loadPromises = pagesToPreload.map(async (pageName) => {
+                try {
+                    const response = await fetch(`./pages/${pageName}.html`);
+                    if (response.ok) {
+                        const html = await response.text();
+                        const pageContainer = document.createElement('div');
+                        pageContainer.id = `page-${pageName}`;
+                        pageContainer.classList.add('preloaded-page');
+                        pageContainer.innerHTML = html;
+                        appContent.appendChild(pageContainer);
+                        return { success: true, page: pageName };
+                    } else {
+                        throw new Error(`Page non trouvée: ${pageName}`);
+                    }
+                } catch(error) { 
+                    console.error(`Erreur de préchargement pour ${pageName}:`, error);
+                    return { success: false, page: pageName };
+                }
+            });
+
+            // Attendre que toutes les pages tentent de se charger
+            await Promise.allSettled(loadPromises);
+        };
+
+        // --- INITIALISATION ---
+
+        // Initialisation de l'application
+        const initializeApp = async () => {
+            // 1. Précharger les pages immédiatement (frontend d'abord)
+            await preloadAllPages();
+            
+            // 2. Exécuter les scripts des pages chargées
+            document.querySelectorAll('.preloaded-page script').forEach(script => {
+                try {
+                    const newScript = document.createElement('script');
+                    newScript.textContent = script.textContent;
+                    document.body.appendChild(newScript).remove();
+                } catch (error) {
+                    console.warn('Erreur script:', error);
+                }
+            });
+            
+            // 3. Activer la navigation immédiatement
+            window.addEventListener('hashchange', handleRouteChange);
+            handleRouteChange();
+            
+            // 4. Charger les données backend en arrière-plan (ne bloque pas l'interface)
+            loadBackendData();
+        };
+
+        // Chargement des données backend en arrière-plan
+        const loadBackendData = async () => {
+            try {
+                // Récupérer le profil utilisateur en arrière-plan
+                currentUserProfile = await getUserProfile(currentUser.id);
+                
+                // Exposer les fonctions globalement pour les pages
+                window.worldWebAPI = {
+                    supabaseClient,
+                    currentUser,
+                    currentUserProfile,
+                    getAllPosts,
+                    createPost,
+                    addReaction,
+                    addComment,
+                    getMessages,
+                    sendMessage,
+                    getGroups,
+                    getUserProfile,
+                    realtimeSubscriptions
+                };
+                
+                console.log('Données backend chargées');
+            } catch (error) {
+                console.warn('Erreur backend (interface reste fonctionnelle):', error);
+                // L'interface continue de fonctionner même si le backend échoue
+            }
+        };
+
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Gestion du thème sauvegardé
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+
+                // Vérification de la session utilisateur
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) { 
+                    window.location.href = 'index.html';
+                    return; 
+                }
+                
+                // Lancement de l'application pour tout utilisateur connecté
+                currentUser = session.user;
+                await initializeApp();
+            } catch (error) {
+                console.error('Erreur lors de l\'initialisation:', error);
+            }
+        });
+
+        // Gestion de la déconnexion et nettoyage
+        window.addEventListener('beforeunload', () => {
+            // Nettoyer les abonnements realtime
+            realtimeSubscriptions.forEach(subscription => {
+                if (subscription && typeof subscription.unsubscribe === 'function') {
+                    try {
+                        subscription.unsubscribe();
+                    } catch (e) {
+                        console.warn('Erreur lors de la déconnexion:', e);
+                    }
+                }
+            });
+            realtimeSubscriptions = [];
+        });
+
+        // --- GESTION DU THÈME ---
+
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('theme-icon');
+        
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.body.classList.toggle('dark-theme');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
+            // Changer l'icône selon le thème
+            if (isDark) {
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>';
+            } else {
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>';
+            }
+        });
+    </script>
+</body>
+</html>
