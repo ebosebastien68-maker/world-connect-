@@ -3,107 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - World Connect</title>
+    <title>World Web - Administration</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --font-family: 'Inter', sans-serif; --transition-speed: 0.2s; --bg-main: #f0f2f5; 
-            --bg-sidebar: #ffffff; --bg-content: #ffffff; --text-primary: #1c1e21; 
-            --text-secondary: #65676b; --border-color: #e0e0e0; --accent-color: #0d6efd; 
+            --font-family: 'Inter', sans-serif; 
+            --transition-speed: 0.2s; 
+            --bg-main: #f0f2f5; 
+            --bg-navbar: #ffffff; 
+            --bg-content: #ffffff; 
+            --text-primary: #1c1e21; 
+            --text-secondary: #65676b; 
+            --border-color: #e0e0e0; 
+            --accent-color: #0d6efd; 
             --shadow-color: rgba(0, 0, 0, 0.05);
+            --hover-bg: #e9ebee;
         }
+        
         body.dark-theme {
-            --bg-main: #18191a; --bg-sidebar: #242526; --bg-content: #242526; 
-            --text-primary: #e4e6eb; --text-secondary: #b0b3b8; --border-color: #3a3b3c; 
-            --accent-color: #4dabf7; --shadow-color: rgba(0, 0, 0, 0.2);
+            --bg-main: #18191a; 
+            --bg-navbar: #242526; 
+            --bg-content: #242526; 
+            --text-primary: #e4e6eb; 
+            --text-secondary: #b0b3b8; 
+            --border-color: #3a3b3c; 
+            --accent-color: #4dabf7; 
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --hover-bg: #3a3b3c;
         }
-        * { box-sizing: border-box; }
-        body { font-family: var(--font-family); margin: 0; background-color: var(--bg-main); color: var(--text-primary); display: grid; grid-template-columns: 240px 1fr; height: 100vh; overflow: hidden; }
-        .sidebar { background-color: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 20px 15px; }
-        .sidebar-header { font-size: 1.5em; font-weight: 700; padding: 0 10px 20px 10px; color: var(--accent-color); }
-        .nav-links { display: flex; flex-direction: column; gap: 8px; }
-        .nav-links a { display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-radius: 8px; text-decoration: none; color: var(--text-secondary); font-weight: 500; transition: all var(--transition-speed); }
-        .nav-links a:hover { background-color: var(--bg-main); color: var(--text-primary); }
-        .nav-links a.active { background-color: var(--accent-color); color: white; }
-        .nav-links svg { width: 22px; height: 22px; flex-shrink: 0; }
-        .main-content-wrapper { display: flex; flex-direction: column; overflow: hidden; }
-        .main-header { padding: 15px 25px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
-        #app-content { flex-grow: 1; overflow-y: auto; padding: 0 25px 25px 25px; }
-        .preloaded-page { display: none; animation: fadeIn 0.4s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .theme-toggle { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 8px; border-radius: 50%; }
-        .theme-toggle:hover { background-color: var(--bg-main); }
-        .loader { text-align: center; padding: 50px; font-size: 1.5em; color: var(--text-secondary); }
+
+        * { 
+            box-sizing: border-box; 
+        }
+        
+        body { 
+            font-family: var(--font-family);
+            margin: 0; 
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+            overflow: hidden;
+            transition: all var(--transition-speed);
+        }
+        
+        .navbar {
+            background-color: var(--bg-navbar);
+            padding: 15px;
+            box-shadow: 0 2px 4px var(--shadow-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .navbar-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        
+        .page-title {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            padding: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            transition: all var(--transition-speed);
+        }
+        
+        .nav-links a.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+        
+        .nav-links a:hover:not(.active) {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+        
+        .nav-links svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-speed);
+        }
+        
+        .theme-toggle:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+        
+        .theme-toggle svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        #app-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 25px;
+            background-color: var(--bg-content);
+        }
+        
+        .preloaded-page {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn { 
+            from { 
+                opacity: 0; 
+                transform: translateY(10px); 
+            } 
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            } 
+        }
+        
+        .loader { 
+            text-align: center; 
+            padding: 50px; 
+            font-size: 1.5em; 
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 10px 15px;
+            }
+            
+            .navbar-left {
+                gap: 15px;
+            }
+            
+            .page-title {
+                font-size: 1.4em;
+            }
+            
+            .navbar-title {
+                font-size: 1.3em;
+            }
+            
+            #app-content {
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
-    <aside class="sidebar">
-        <div class="sidebar-header">World Connect</div>
-        <nav class="nav-links">
-            <a href="#home" class="nav-link active" title="Accueil">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                <span>Accueil</span>
-            </a>
-            <a href="#publier" class="nav-link" title="Publier">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span>Publier</span>
-            </a>
-            <a href="#menu" class="nav-link" title="Menu">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                <span>Menu</span>
-            </a>
-        </nav>
-    </aside>
 
-    <div class="main-content-wrapper">
-        <header class="main-header">
-            <h1 id="page-title" style="font-size: 1.8em; margin: 0;">Accueil</h1>
+    <nav class="navbar">
+        <div class="navbar-left">
+            <div class="navbar-title">World Web</div>
+            <h1 class="page-title" id="page-title">Accueil</h1>
+        </div>
+        
+        <div class="navbar-right">
+            <div class="nav-links">
+                <a href="#home" class="nav-link active" title="Accueil">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                </a>
+                <a href="#messages" class="nav-link" title="Messages">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path>
+                    </svg>
+                </a>
+                <a href="#groupes" class="nav-link" title="Groupes">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path>
+                    </svg>
+                </a>
+                <a href="#publier" class="nav-link" title="Publier">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </a>
+                <a href="#notifications" class="nav-link" title="Notifications">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"></path>
+                    </svg>
+                </a>
+                <a href="#menu" class="nav-link" title="Menu">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </a>
+            </div>
+            
             <button class="theme-toggle" id="themeToggle" title="Changer de thème">
-                <svg id="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                <svg id="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
             </button>
-        </header>
-        <main id="app-content">
-            <div class="loader">Chargement...</div>
-        </main>
-    </div>
+        </div>
+    </nav>
+
+    <main id="app-content">
+        <div class="loader">Chargement de l'application...</div>
+    </main>
 
     <script>
-        // --- NOUVELLES DONNÉES DE CONNEXION ---
+        // --- DONNÉES DE CONNEXION MISES À JOUR ---
         const SUPABASE_URL = 'https://nmqzrouoeopanloskkvi.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
         
         const { createClient } = supabase;
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
-        
-        document.addEventListener('DOMContentLoaded', async () => {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
 
-            // On vérifie seulement si un utilisateur est connecté.
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { 
-                window.location.href = 'index.html'; // Renvoie vers la page de connexion
-                return; 
-            }
-            
-            // On lance l'application pour tout utilisateur connecté.
-            currentUser = session.user;
-            await initializeApp();
-        });
-
+        // Éléments DOM
         const appContent = document.getElementById('app-content');
         const navLinks = document.querySelectorAll('.nav-link');
         const pageTitle = document.getElementById('page-title');
-        const pagesToPreload = ['home', 'publier', 'menu'];
+        const pagesToPreload = ['home', 'messages', 'groupes', 'publier', 'notifications', 'menu'];
 
+        // Fonction pour afficher une page
         const showPage = (page) => {
             document.querySelectorAll('.preloaded-page').forEach(p => p.style.display = 'none');
             const activePage = document.getElementById(`page-${page}`);
             if (activePage) activePage.style.display = 'block';
+            
             navLinks.forEach(link => {
                 link.classList.remove('active');
                 if (link.href.includes(page)) {
@@ -113,11 +283,13 @@
             });
         };
         
+        // Gestion des changements de route
         const handleRouteChange = () => {
             const page = window.location.hash.substring(1) || 'home';
             showPage(page);
         };
         
+        // Préchargement de toutes les pages
         const preloadAllPages = async () => {
             appContent.innerHTML = '';
             for (const pageName of pagesToPreload) {
@@ -130,25 +302,60 @@
                     pageContainer.classList.add('preloaded-page');
                     pageContainer.innerHTML = html;
                     appContent.appendChild(pageContainer);
-                } catch(e) { console.error(e); }
+                } catch(error) { 
+                    console.error(`Erreur de préchargement pour ${pageName}:`, error); 
+                }
             }
         };
 
+        // Initialisation de l'application
         const initializeApp = async () => {
             await preloadAllPages();
+            
+            // Exécution des scripts des pages préchargées
             document.querySelectorAll('.preloaded-page script').forEach(script => {
                 const newScript = document.createElement('script');
                 newScript.textContent = script.textContent;
                 document.body.appendChild(newScript).remove();
             });
+            
+            // Gestion des routes
             window.addEventListener('hashchange', handleRouteChange);
             handleRouteChange();
         };
 
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Gestion du thème sauvegardé
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+
+            // Vérification de la session utilisateur
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { 
+                window.location.href = 'index.html'; // Redirection vers la page de connexion
+                return; 
+            }
+            
+            // Lancement de l'application pour tout utilisateur connecté
+            currentUser = session.user;
+            await initializeApp();
+        });
+
+        // Gestion du basculement de thème
         const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('theme-icon');
+        
         themeToggle.addEventListener('click', () => {
             const isDark = document.body.classList.toggle('dark-theme');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
+            // Optionnel: changer l'icône selon le thème
+            if (isDark) {
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>';
+            } else {
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>';
+            }
         });
     </script>
 </body>
