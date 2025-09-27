@@ -216,13 +216,19 @@
     if (postIdToUpdate) {
         editMode = true;
         publishButton.textContent = "Mettre à jour l'Article";
-        const { data: postToEdit, error } = await supabaseClient.from('posts').select('*').eq('id', postIdToUpdate).single();
+        
+        // Récupération des données avec les nouvelles tables normalisées
+        const { data: postToEdit, error: postError } = await supabaseClient.from('posts').select('*').eq('id', postIdToUpdate).single();
+        const { data: postImages } = await supabaseClient.from('post_images').select('image_url').eq('post_id', postIdToUpdate);
+        const { data: postWhatsApp } = await supabaseClient.from('post_whatsapp_numbers').select('whatsapp_number').eq('post_id', postIdToUpdate);
+        const { data: postLinks } = await supabaseClient.from('post_custom_links').select('title, url').eq('post_id', postIdToUpdate);
+        
         if (postToEdit) {
             postDraft.content = postToEdit.content || "";
-            postDraft.imageUrls = (postToEdit.image_urls || []).concat(Array(5).fill("")).slice(0, 5);
-            postDraft.whatsappNumbers = (postToEdit.whatsapp_numbers || []).concat(Array(3).fill("")).slice(0, 3);
+            postDraft.imageUrls = (postImages?.map(img => img.image_url) || []).concat(Array(5).fill("")).slice(0, 5);
+            postDraft.whatsappNumbers = (postWhatsApp?.map(wp => wp.whatsapp_number) || []).concat(Array(3).fill("")).slice(0, 3);
             postDraft.buyLink = postToEdit.buy_link || "";
-            postDraft.customLinks = (postToEdit.custom_links || []).concat(Array(7).fill({title:"",url:""})).slice(0, 7);
+            postDraft.customLinks = (postLinks?.map(link => ({title: link.title, url: link.url})) || []).concat(Array(7).fill({title:"",url:""})).slice(0, 7);
             updateUIFromDraft();
         }
     }
@@ -254,32 +260,62 @@
         const finalData = {
             user_id: currentUser.id,
             content: postDraft.content,
-            image_urls: postDraft.imageUrls.filter(url => url),
-            whatsapp_numbers: postDraft.whatsappNumbers.filter(num => num),
-            buy_link: postDraft.buyLink,
-            custom_links: postDraft.customLinks.filter(link => link.url && link.title)
+            buy_link: postDraft.buyLink
         };
         if (mediaPublicUrl) {
             finalData.media_url = mediaPublicUrl;
         }
         
         let error;
+        let postId;
+        
         if (editMode) {
+            // Mise à jour du post principal
             const { error: updateError } = await supabaseClient.from('posts').update(finalData).eq('id', postIdToUpdate);
             error = updateError;
+            postId = postIdToUpdate;
+            
+            if (!error) {
+                // Supprimer les anciennes données des tables liées
+                await supabaseClient.from('post_images').delete().eq('post_id', postId);
+                await supabaseClient.from('post_whatsapp_numbers').delete().eq('post_id', postId);
+                await supabaseClient.from('post_custom_links').delete().eq('post_id', postId);
+            }
         } else {
-            const { error: insertError } = await supabaseClient.from('posts').insert(finalData);
+            // Création d'un nouveau post
+            const { data: newPost, error: insertError } = await supabaseClient.from('posts').insert(finalData).select('id').single();
             error = insertError;
+            postId = newPost?.id;
         }
 
         if (error) {
             publishStatus.textContent = `Erreur: ${error.message}`;
             console.error(error);
-        } else {
-            publishStatus.textContent = editMode ? 'Article mis à jour !' : 'Article publié !';
-            setTimeout(() => window.location.hash = '#home', 1500);
+            return;
         }
+
+        // Insertion dans les tables liées
+        const imageData = postDraft.imageUrls.filter(url => url).map(url => ({ post_id: postId, image_url: url }));
+        const whatsappData = postDraft.whatsappNumbers.filter(num => num).map(num => ({ post_id: postId, whatsapp_number: num }));
+        const linksData = postDraft.customLinks.filter(link => link.url && link.title).map(link => ({ post_id: postId, title: link.title, url: link.url }));
+
+        const insertPromises = [];
+        if (imageData.length > 0) insertPromises.push(supabaseClient.from('post_images').insert(imageData));
+        if (whatsappData.length > 0) insertPromises.push(supabaseClient.from('post_whatsapp_numbers').insert(whatsappData));
+        if (linksData.length > 0) insertPromises.push(supabaseClient.from('post_custom_links').insert(linksData));
+
+        if (insertPromises.length > 0) {
+            const results = await Promise.all(insertPromises);
+            const hasError = results.some(result => result.error);
+            if (hasError) {
+                publishStatus.textContent = 'Erreur lors de l\'insertion des données liées';
+                console.error('Erreurs:', results.filter(r => r.error));
+                return;
+            }
+        }
+
+        publishStatus.textContent = editMode ? 'Article mis à jour !' : 'Article publié !';
+        setTimeout(() => window.location.hash = '#home', 1500);
     });
 })();
-                                                                                   </script>
-                                                                                   
+            </script>
