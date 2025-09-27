@@ -111,9 +111,16 @@
     }
 
     const fetchPosts = async () => {
+        // Récupération des posts avec les données des tables liées
         const { data: posts, error } = await supabaseClient
             .from('posts')
-            .select(`*, profiles(email)`) // On récupère l'email de l'auteur
+            .select(`
+                *,
+                profiles(email),
+                post_images(image_url),
+                post_whatsapp_numbers(whatsapp_number),
+                post_custom_links(title, url)
+            `)
             .order('created_at', { ascending: false });
 
         if (error) { 
@@ -129,6 +136,12 @@
             ? '<p>Aucun article à afficher pour le moment.</p>'
             : posts.map(post => {
                 const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
+                
+                // Extraction des données des tables liées
+                const imageUrls = post.post_images?.map(img => img.image_url) || [];
+                const whatsappNumbers = post.post_whatsapp_numbers?.map(wp => wp.whatsapp_number) || [];
+                const customLinks = post.post_custom_links?.map(link => ({ title: link.title, url: link.url })) || [];
+                
                 return `
                 <div class="post-card" data-post-id="${post.id}">
                     <div class="post-header">
@@ -151,13 +164,13 @@
                     <div class="post-content">
                         <p>${post.content || ''}</p>
                         <div class="post-media-grid">
-                            ${(post.image_urls || []).map(url => `<img src="${url}" alt="Image externe">`).join('')}
+                            ${imageUrls.map(url => `<img src="${url}" alt="Image externe">`).join('')}
                             ${post.media_url ? `<img src="${post.media_url}" alt="Média importé">` : ''}
                         </div>
                         <div class="post-links-container">
-                            ${(post.whatsapp_numbers || []).map(num => `<a href="https://wa.me/${num}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
+                            ${whatsappNumbers.map(num => `<a href="https://wa.me/${num}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
                             ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
-                            ${(post.custom_links || []).map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
+                            ${customLinks.map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
                         </div>
                     </div>
                     <div class="post-interactions">
@@ -193,7 +206,15 @@
             window.location.hash = `#publier?edit=${postId}`;
         } else if (action === 'delete') {
             if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
-                await supabaseClient.from('posts').delete().eq('id', postId);
+                // Suppression en cascade des tables liées sera gérée par les contraintes FK
+                const { error } = await supabaseClient.from('posts').delete().eq('id', postId);
+                if (error) {
+                    console.error('Erreur lors de la suppression:', error);
+                    alert('Erreur lors de la suppression de l\'article');
+                } else {
+                    // Le refresh sera automatique grâce au real-time
+                    console.log('Article supprimé avec succès');
+                }
             }
         }
     });
@@ -205,10 +226,14 @@
     });
 
     await fetchPosts();
+    
+    // Écoute des changements en temps réel sur toutes les tables concernées
     supabaseClient
-        .channel('public-posts')
+        .channel('posts-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'post_images' }, fetchPosts)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'post_whatsapp_numbers' }, fetchPosts)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'post_custom_links' }, fetchPosts)
         .subscribe();
 })();
-                              </script>
-                              
+            </script>
