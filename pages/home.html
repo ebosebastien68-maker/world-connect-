@@ -1,0 +1,214 @@
+<style>
+    /* Utilisation de variables CSS pour une maintenance facile du design */
+    :root {
+        --border-color-home: #e9ebee;
+        --card-background-home: #fff;
+        --text-color-home: #1c1e21;
+        --text-color-secondary-home: #65676b;
+        --primary-color-home: #007bff;
+        --hover-background-home: #f0f2f5;
+    }
+
+    .home-container { max-width: 750px; margin: auto; padding: 0 10px; }
+    .post-card {
+        background: var(--bg-content, var(--card-background-home));
+        border-radius: 12px;
+        border: 1px solid var(--border-color, var(--border-color-home));
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+        overflow: hidden;
+        color: var(--text-primary, var(--text-color-home));
+    }
+
+    /* --- En-tête de l'article --- */
+    .post-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+    }
+    .post-author-info { display: flex; flex-direction: column; }
+    .post-author { font-weight: 600; font-size: 1.1em; }
+    .post-timestamp { font-size: 0.85em; color: var(--text-secondary, var(--text-color-secondary-home)); }
+    
+    /* --- Contenu de l'article --- */
+    .post-content { padding: 0 20px 20px 20px; line-height: 1.6; }
+    .post-content p { margin: 0; }
+    .post-media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 5px; margin-top: 15px; }
+    .post-media-grid img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+
+    /* --- Liens (WhatsApp, Acheter, etc.) --- */
+    .post-links-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+    .post-link-btn {
+        background-color: var(--hover-background, var(--hover-background-home)); color: var(--text-primary, var(--text-color-home));
+        text-decoration: none; padding: 8px 15px; border-radius: 20px;
+        font-size: 0.9em; font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .post-link-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .whatsapp-btn { background-color: #25D366; color: white; }
+    .buy-btn { background-color: var(--accent-color, var(--primary-color-home)); color: white; }
+
+    /* --- Section des interactions (Réactions, Commentaires) --- */
+    .post-interactions { border-top: 1px solid var(--border-color, var(--border-color-home)); padding: 5px 20px 15px 20px; }
+    .post-actions { display: flex; justify-content: space-around; padding: 10px 0; }
+    .action-btn {
+        background: none; border: none; cursor: pointer; font-size: 24px;
+        color: var(--text-secondary, var(--text-color-secondary-home)); padding: 8px; border-radius: 8px;
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .action-btn:hover { background-color: var(--hover-background, var(--hover-background-home)); color: var(--accent-color, var(--primary-color-home)); }
+    .comment-form { display: flex; gap: 10px; margin-top: 10px; }
+    .comment-form input {
+        flex-grow: 1; background-color: var(--hover-background, var(--hover-background-home));
+        border: none; padding: 12px 18px; border-radius: 20px;
+        color: var(--text-primary, var(--text-color-home));
+    }
+    .login-prompt { text-align: center; color: var(--text-secondary, var(--text-color-secondary-home)); padding: 15px 0; }
+    .login-prompt a { color: var(--accent-color, var(--primary-color-home)); font-weight: 600; text-decoration: none; }
+
+    /* --- Menu Admin --- */
+    .post-menu { position: relative; }
+    .post-menu-button { background: none; border: none; cursor: pointer; padding: 5px; border-radius: 50%; color: var(--text-secondary, var(--text-color-secondary-home)); }
+    .post-menu-button:hover { background-color: var(--hover-background, var(--hover-background-home)); }
+    .post-menu-dropdown { display: none; position: absolute; right: 0; top: 100%; background: var(--bg-content, white); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); list-style: none; padding: 8px 0; margin: 5px 0 0 0; width: 160px; z-index: 10; }
+    .post-menu-dropdown.visible { display: block; }
+    .post-menu-dropdown li button { background: none; border: none; width: 100%; padding: 10px 15px; text-align: left; cursor: pointer; font-size: 14px; color: var(--text-primary, var(--text-color-home)); }
+    .post-menu-dropdown li button:hover { background-color: var(--hover-background, var(--hover-background-home)); }
+    .delete-action { color: #dc3545; }
+</style>
+
+<div class="home-container" id="posts-feed">
+    </div>
+
+<script>
+(async function() {
+    // Les variables `supabaseClient` et `currentUser` sont déjà créées par `main.html`
+    const postsFeed = document.getElementById('posts-feed');
+    if (!postsFeed) return;
+
+    let currentUserProfile = null;
+    if (currentUser) {
+        const { data } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
+        currentUserProfile = data;
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.round((now - date) / 1000);
+        const minutes = Math.round(seconds / 60);
+        const hours = Math.round(minutes / 60);
+        const days = Math.round(hours / 24);
+        if (seconds < 60) return `à l'instant`;
+        if (minutes < 60) return `il y a ${minutes} min`;
+        if (hours < 24) return `il y a ${hours} h`;
+        if (days < 7) return `il y a ${days} j`;
+        return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    const fetchPosts = async () => {
+        const { data: posts, error } = await supabaseClient
+            .from('posts')
+            .select(`*, profiles(email)`) // On récupère l'email de l'auteur
+            .order('created_at', { ascending: false });
+
+        if (error) { 
+            console.error("Erreur de chargement des posts:", error);
+            postsFeed.innerHTML = '<p>Impossible de charger les articles.</p>'; 
+            return; 
+        }
+        renderPosts(posts);
+    };
+
+    const renderPosts = (posts) => {
+        postsFeed.innerHTML = !posts || posts.length === 0
+            ? '<p>Aucun article à afficher pour le moment.</p>'
+            : posts.map(post => {
+                const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
+                return `
+                <div class="post-card" data-post-id="${post.id}">
+                    <div class="post-header">
+                        <div class="post-author-info">
+                            <span class="post-author">${post.profiles.email || 'Anonyme'}</span>
+                            <small class="post-timestamp">${formatDate(post.created_at)}</small>
+                        </div>
+                        ${isAdmin ? `
+                        <div class="post-menu">
+                            <button class="post-menu-button" data-action="toggle-menu" title="Options">
+                                <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
+                            </button>
+                            <ul class="post-menu-dropdown">
+                                <li><button data-action="edit">Modifier</button></li>
+                                <li><button data-action="delete" class="delete-action">Supprimer</button></li>
+                            </ul>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="post-content">
+                        <p>${post.content || ''}</p>
+                        <div class="post-media-grid">
+                            ${(post.image_urls || []).map(url => `<img src="${url}" alt="Image externe">`).join('')}
+                            ${post.media_url ? `<img src="${post.media_url}" alt="Média importé">` : ''}
+                        </div>
+                        <div class="post-links-container">
+                            ${(post.whatsapp_numbers || []).map(num => `<a href="https://wa.me/${num}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
+                            ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
+                            ${(post.custom_links || []).map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
+                        </div>
+                    </div>
+                    <div class="post-interactions">
+                    ${currentUser ? `
+                        <div class="post-actions">
+                            <button class="action-btn" title="J'aime">👍</button>
+                            <button class="action-btn" title="J'adore">❤️</button>
+                            <button class="action-btn" title="Haha">🤣</button>
+                            <button class="action-btn" title="Grrr">😡</button>
+                        </div>
+                        <div class="comments-section">
+                            <form class="comment-form"><input type="text" placeholder="Ajouter un commentaire..." required></form>
+                        </div>
+                    ` : `
+                        <p class="login-prompt"><a href="index.html">Connectez-vous</a> pour réagir ou commenter.</p>
+                    `}
+                    </div>
+                </div>
+                `;
+            }).join('');
+    };
+
+    postsFeed.addEventListener('click', async (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+        const action = button.dataset.action;
+        const postCard = button.closest('.post-card');
+        const postId = postCard ? postCard.dataset.postId : null;
+
+        if (action === 'toggle-menu') {
+            button.nextElementSibling.classList.toggle('visible');
+        } else if (action === 'edit') {
+            window.location.hash = `#publier?edit=${postId}`;
+        } else if (action === 'delete') {
+            if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
+                await supabaseClient.from('posts').delete().eq('id', postId);
+            }
+        }
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.post-menu')) {
+            document.querySelectorAll('.post-menu-dropdown.visible').forEach(menu => menu.classList.remove('visible'));
+        }
+    });
+
+    await fetchPosts();
+    supabaseClient
+        .channel('public-posts')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, fetchPosts)
+        .subscribe();
+})();
+                              </script>
+                              
