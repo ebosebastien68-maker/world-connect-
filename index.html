@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - World Connect</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .auth-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h1 { text-align: center; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #666; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        .forgot-password { text-align: center; margin-top: 15px; }
+        .forgot-password a { color: #007bff; text-decoration: none; cursor: pointer; }
+        .message { text-align: center; padding: 10px; margin-bottom: 15px; border-radius: 4px; display: none; }
+        .message.success { background-color: #d4edda; color: #155724; }
+        .message.error { background-color: #f8d7da; color: #721c24; }
+        #resetPasswordForm { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container">
+        <div id="authForm">
+            <h1>Connexion</h1>
+            <div id="message" class="message"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Se connecter</button>
+            </form>
+            <div class="forgot-password">
+                <a id="forgotPasswordLink">Mot de passe oublié ?</a>
+            </div>
+        </div>
+
+        <div id="resetPasswordForm">
+             <h1>Nouveau mot de passe</h1>
+             <div id="resetMessage" class="message"></div>
+             <form id="updatePasswordForm">
+                <div class="form-group">
+                    <label for="newPassword">Nouveau mot de passe</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <button type="submit">Mettre à jour</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- NOUVELLES DONNÉES DE CONNEXION ---
+        const SUPABASE_URL = 'https://nmqzrouoeopanloskkvi.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const authForm = document.getElementById('authForm');
+        const loginForm = document.getElementById('loginForm');
+        const resetPasswordForm = document.getElementById('resetPasswordForm');
+        const updatePasswordForm = document.getElementById('updatePasswordForm');
+        const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+        const messageDiv = document.getElementById('message');
+        const resetMessageDiv = document.getElementById('resetMessage');
+
+        const showMessage = (element, text, type = 'error') => {
+            element.textContent = text;
+            element.className = `message ${type}`;
+            element.style.display = 'block';
+        };
+        const hideMessage = (element) => { element.style.display = 'none'; };
+
+        const handleLogin = async (event) => {
+            event.preventDefault();
+            hideMessage(messageDiv);
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                showMessage(messageDiv, "Email ou mot de passe incorrect.");
+            } else {
+                window.location.href = 'main.html';
+            }
+        };
+
+        const handlePasswordResetRequest = async () => {
+            hideMessage(messageDiv);
+            const email = prompt("Veuillez entrer votre adresse e-mail :");
+            if (email) {
+                const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.href.split('#')[0],
+                });
+                if (error) { showMessage(messageDiv, error.message); } 
+                else { showMessage(messageDiv, "Si un compte existe, un lien a été envoyé.", 'success'); }
+            }
+        };
+
+        const handlePasswordUpdate = async (event) => {
+            event.preventDefault();
+            hideMessage(resetMessageDiv);
+            const newPassword = document.getElementById('newPassword').value;
+            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+            if (error) { showMessage(resetMessageDiv, error.message); } 
+            else {
+                showMessage(resetMessageDiv, "Mot de passe mis à jour.", 'success');
+                setTimeout(() => {
+                    resetPasswordForm.style.display = 'none';
+                    authForm.style.display = 'block';
+                    window.location.hash = '';
+                }, 3000);
+            }
+        };
+
+        loginForm.addEventListener('submit', handleLogin);
+        forgotPasswordLink.addEventListener('click', handlePasswordResetRequest);
+        updatePasswordForm.addEventListener('submit', handlePasswordUpdate);
+
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                authForm.style.display = 'none';
+                resetPasswordForm.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+  </html>
+  
