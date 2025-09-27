@@ -175,6 +175,24 @@
             color: var(--text-secondary);
         }
 
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #c3e6cb;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .navbar {
@@ -254,13 +272,16 @@
     </main>
 
     <script>
-        // --- DONNÉES DE CONNEXION MISES À JOUR ---
+        // --- CONFIGURATION SUPABASE ---
         const SUPABASE_URL = 'https://nmqzrouoeopanloskkvi.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
         
         const { createClient } = supabase;
         const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Variables globales
         let currentUser = null;
+        let currentUserProfile = null;
 
         // Éléments DOM
         const appContent = document.getElementById('app-content');
@@ -268,95 +289,273 @@
         const pageTitle = document.getElementById('page-title');
         const pagesToPreload = ['home', 'messages', 'groupes', 'publier', 'notifications', 'menu'];
 
-        // Fonction pour afficher une page
-        const showPage = (page) => {
-            document.querySelectorAll('.preloaded-page').forEach(p => p.style.display = 'none');
-            const activePage = document.getElementById(`page-${page}`);
-            if (activePage) activePage.style.display = 'block';
+        // --- FONCTIONS UTILITAIRES ---
+
+        // Fonction pour afficher les erreurs
+        const showError = (message) => {
+            console.error('Erreur:', message);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            appContent.insertBefore(errorDiv, appContent.firstChild);
             
-            navLinks.forEach(link => {
-                link.classList.remove('active');
-                if (link.href.includes(page)) {
-                    link.classList.add('active');
-                    pageTitle.textContent = link.title;
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
                 }
-            });
+            }, 5000);
         };
-        
-        // Gestion des changements de route
-        const handleRouteChange = () => {
-            const page = window.location.hash.substring(1) || 'home';
-            showPage(page);
-        };
-        
-        // Préchargement de toutes les pages
-        const preloadAllPages = async () => {
-            appContent.innerHTML = '';
-            for (const pageName of pagesToPreload) {
-                try {
-                    const response = await fetch(`./pages/${pageName}.html`);
-                    if (!response.ok) throw new Error(`Page non trouvée: ${pageName}`);
-                    const html = await response.text();
-                    const pageContainer = document.createElement('div');
-                    pageContainer.id = `page-${pageName}`;
-                    pageContainer.classList.add('preloaded-page');
-                    pageContainer.innerHTML = html;
-                    appContent.appendChild(pageContainer);
-                } catch(error) { 
-                    console.error(`Erreur de préchargement pour ${pageName}:`, error); 
+
+        // Fonction pour afficher les messages de succès
+        const showSuccess = (message) => {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            appContent.insertBefore(successDiv, appContent.firstChild);
+            
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.parentNode.removeChild(successDiv);
                 }
+            }, 3000);
+        };
+
+        // --- FONCTIONS D'API SUPABASE ---
+
+        // Récupérer le profil utilisateur
+        const getUserProfile = async (userId) => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                console.error('Erreur lors de la récupération du profil:', error);
+                return null;
             }
         };
 
-        // Initialisation de l'application
-        const initializeApp = async () => {
-            await preloadAllPages();
-            
-            // Exécution des scripts des pages préchargées
-            document.querySelectorAll('.preloaded-page script').forEach(script => {
-                const newScript = document.createElement('script');
-                newScript.textContent = script.textContent;
-                document.body.appendChild(newScript).remove();
-            });
-            
-            // Gestion des routes
-            window.addEventListener('hashchange', handleRouteChange);
-            handleRouteChange();
+        // Récupérer tous les posts avec leurs données liées
+        const getAllPosts = async () => {
+            try {
+                const { data: posts, error } = await supabaseClient
+                    .from('posts')
+                    .select(`
+                        *,
+                        profiles:user_id (
+                            id,
+                            email,
+                            avatar_url
+                        ),
+                        post_images (
+                            id,
+                            image_url
+                        ),
+                        post_whatsapp_numbers (
+                            id,
+                            whatsapp_number
+                        ),
+                        post_custom_links (
+                            id,
+                            title,
+                            url
+                        ),
+                        reactions (
+                            id,
+                            reaction_type,
+                            user_id
+                        ),
+                        comments (
+                            id,
+                            content,
+                            created_at,
+                            profiles:user_id (
+                                id,
+                                email
+                            )
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                return posts || [];
+            } catch (error) {
+                console.error('Erreur lors du chargement des posts:', error);
+                showError('Impossible de charger les publications');
+                return [];
+            }
         };
 
-        // Initialisation au chargement de la page
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Gestion du thème sauvegardé
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+        // Créer un nouveau post
+        const createPost = async (postData) => {
+            try {
+                const { data: post, error } = await supabaseClient
+                    .from('posts')
+                    .insert([{
+                        user_id: currentUser.id,
+                        content: postData.content,
+                        media_url: postData.media_url,
+                        buy_link: postData.buy_link
+                    }])
+                    .select()
+                    .single();
 
-            // Vérification de la session utilisateur
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { 
-                window.location.href = 'index.html'; // Redirection vers la page de connexion
-                return; 
-            }
-            
-            // Lancement de l'application pour tout utilisateur connecté
-            currentUser = session.user;
-            await initializeApp();
-        });
+                if (error) throw error;
 
-        // Gestion du basculement de thème
-        const themeToggle = document.getElementById('themeToggle');
-        const themeIcon = document.getElementById('theme-icon');
-        
-        themeToggle.addEventListener('click', () => {
-            const isDark = document.body.classList.toggle('dark-theme');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-            
-            // Optionnel: changer l'icône selon le thème
-            if (isDark) {
-                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>';
-            } else {
-                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>';
+                // Ajouter les images si présentes
+                if (postData.images && postData.images.length > 0) {
+                    const imageInserts = postData.images.map(imageUrl => ({
+                        post_id: post.id,
+                        image_url: imageUrl
+                    }));
+                    
+                    const { error: imageError } = await supabaseClient
+                        .from('post_images')
+                        .insert(imageInserts);
+                    
+                    if (imageError) console.error('Erreur lors de l\'ajout des images:', imageError);
+                }
+
+                // Ajouter les numéros WhatsApp si présents
+                if (postData.whatsapp_numbers && postData.whatsapp_numbers.length > 0) {
+                    const whatsappInserts = postData.whatsapp_numbers.map(number => ({
+                        post_id: post.id,
+                        whatsapp_number: number
+                    }));
+                    
+                    const { error: whatsappError } = await supabaseClient
+                        .from('post_whatsapp_numbers')
+                        .insert(whatsappInserts);
+                    
+                    if (whatsappError) console.error('Erreur lors de l\'ajout des numéros WhatsApp:', whatsappError);
+                }
+
+                // Ajouter les liens personnalisés si présents
+                if (postData.custom_links && postData.custom_links.length > 0) {
+                    const linkInserts = postData.custom_links.map(link => ({
+                        post_id: post.id,
+                        title: link.title,
+                        url: link.url
+                    }));
+                    
+                    const { error: linkError } = await supabaseClient
+                        .from('post_custom_links')
+                        .insert(linkInserts);
+                    
+                    if (linkError) console.error('Erreur lors de l\'ajout des liens:', linkError);
+                }
+
+                return post;
+            } catch (error) {
+                console.error('Erreur lors de la création du post:', error);
+                showError('Impossible de créer la publication');
+                return null;
             }
-        });
-    </script>
-</body>
-</html>
+        };
+
+        // Ajouter une réaction à un post
+        const addReaction = async (postId, reactionType) => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('reactions')
+                    .upsert([{
+                        post_id: postId,
+                        user_id: currentUser.id,
+                        reaction_type: reactionType
+                    }])
+                    .select();
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                console.error('Erreur lors de l\'ajout de la réaction:', error);
+                return null;
+            }
+        };
+
+        // Ajouter un commentaire à un post
+        const addComment = async (postId, content, parentCommentId = null) => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('comments')
+                    .insert([{
+                        post_id: postId,
+                        user_id: currentUser.id,
+                        content: content,
+                        parent_comment_id: parentCommentId
+                    }])
+                    .select(`
+                        *,
+                        profiles:user_id (
+                            id,
+                            email
+                        )
+                    `)
+                    .single();
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                console.error('Erreur lors de l\'ajout du commentaire:', error);
+                showError('Impossible d\'ajouter le commentaire');
+                return null;
+            }
+        };
+
+        // Récupérer les messages
+        const getMessages = async () => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('messages')
+                    .select(`
+                        *,
+                        sender:sender_id (
+                            id,
+                            email
+                        ),
+                        receiver:receiver_id (
+                            id,
+                            email
+                        )
+                    `)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                return data || [];
+            } catch (error) {
+                console.error('Erreur lors du chargement des messages:', error);
+                return [];
+            }
+        };
+
+        // Envoyer un message
+        const sendMessage = async (receiverId, content) => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('messages')
+                    .insert([{
+                        sender_id: currentUser.id,
+                        receiver_id: receiverId,
+                        content: content
+                    }])
+                    .select(`
+                        *,
+                        sender:sender_id (
+                            id,
+                            email
+                        ),
+                        receiver:receiver_id (
+                            id,
+                            email
+                        )
+                    `)
+                    .single();
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                console.error('Erreur 
