@@ -144,18 +144,29 @@
             await preloadAllPages();
             
             // CORRECTION: Gestion sécurisée des scripts des pages préchargées
-            try {
-                document.querySelectorAll('.preloaded-page script').forEach(script => {
+            const scripts = document.querySelectorAll('.preloaded-page script');
+            scripts.forEach((script, index) => {
+                try {
                     if (script.textContent && script.textContent.trim()) {
+                        // Vérifier si le script a une syntaxe valide avant de l'exécuter
+                        new Function(script.textContent);
+                        
                         const newScript = document.createElement('script');
                         newScript.textContent = script.textContent;
-                        document.body.appendChild(newScript);
-                        document.body.removeChild(newScript);
+                        document.head.appendChild(newScript);
+                        
+                        // Nettoyer le script original pour éviter les doublons
+                        script.remove();
+                        
+                        console.log(`Script ${index + 1} chargé avec succès`);
                     }
-                });
-            } catch (error) {
-                console.error('Erreur lors de l\'exécution des scripts des pages:', error);
-            }
+                } catch (error) {
+                    console.error(`Erreur dans le script ${index + 1}:`, error);
+                    console.error('Contenu du script problématique:', script.textContent);
+                    // Retirer le script défectueux
+                    script.remove();
+                }
+            });
             
             showPage('home');
         };
