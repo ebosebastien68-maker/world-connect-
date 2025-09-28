@@ -123,6 +123,25 @@
     .retry-btn:hover {
         opacity: 0.9;
     }
+
+    /* --- Indicateur de fin de page --- */
+    .end-of-feed {
+        text-align: center;
+        padding: 30px 20px;
+        color: var(--text-secondary, var(--text-color-secondary-home));
+        font-size: 0.9em;
+        border-top: 1px solid var(--border-color, var(--border-color-home));
+        margin-top: 20px;
+    }
+
+    /* --- Loader pour défilement infini --- */
+    .infinite-scroll-loader {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 30px 20px;
+        color: var(--text-secondary, var(--text-color-secondary-home));
+    }
 </style>
 
 <div class="home-container" id="posts-feed">
@@ -139,6 +158,13 @@
 
     let currentUserProfile = null;
     let loadTimeout = null;
+    
+    // Variables pour la pagination et le défilement infini
+    let currentPage = 0;
+    const postsPerPage = 10;
+    let isLoading = false;
+    let hasMorePosts = true;
+    let allPosts = []; // Cache des posts chargés
 
     // Récupérer le profil utilisateur si connecté
     if (window.currentUser) {
@@ -168,24 +194,26 @@
         return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
-    const showError = (message) => {
-        postsFeed.innerHTML = `
-            <div class="error-alert">
-                <strong>Erreur de chargement</strong><br>
-                ${message}
-                <br><button class="retry-btn" onclick="window.location.reload()">Réessayer</button>
-            </div>
-        `;
-    };
+    // Fonction d'erreur supprimée selon les nouveaux ajustements
 
-    const fetchPosts = async () => {
+    const fetchPosts = async (page = 0, append = false) => {
+        if (isLoading) return;
+        isLoading = true;
+        
         try {
-            // Timeout de 5 secondes
-            loadTimeout = setTimeout(() => {
-                showError('Le chargement prend plus de temps que prévu. Vérifiez votre connexion.');
-            }, 5000);
+            // Afficher le loader si c'est un ajout de page
+            if (append) {
+                const loader = document.createElement('div');
+                loader.className = 'infinite-scroll-loader';
+                loader.innerHTML = '<div class="loading-spinner"></div>Chargement de plus de publications...';
+                loader.id = 'scroll-loader';
+                postsFeed.appendChild(loader);
+            }
 
-            // Requête corrigée pour la structure normalisée
+            // Requête paginée avec collecte complète des données
+            const from = page * postsPerPage;
+            const to = from + postsPerPage - 1;
+
             const { data: posts, error } = await window.supabaseClient
                 .from('posts')
                 .select(`
@@ -197,36 +225,86 @@
                     created_at,
                     profiles:user_id (
                         email,
-                        avatar_url
+                        avatar_url,
+                        role
                     ),
                     post_images (
+                        id,
                         image_url
                     ),
                     post_whatsapp_numbers (
+                        id,
                         whatsapp_number
                     ),
                     post_custom_links (
+                        id,
                         title,
                         url
+                    ),
+                    reactions (
+                        id,
+                        user_id,
+                        reaction_type,
+                        created_at
+                    ),
+                    comments (
+                        id,
+                        user_id,
+                        content,
+                        created_at,
+                        parent_comment_id,
+                        profiles:user_id (
+                            email,
+                            avatar_url
+                        )
                     )
                 `)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
-            // Annuler le timeout
-            clearTimeout(loadTimeout);
+            // Supprimer le loader de défilement
+            const scrollLoader = document.getElementById('scroll-loader');
+            if (scrollLoader) {
+                scrollLoader.remove();
+            }
 
+            // Traitement silencieux des erreurs - pas de messages d'erreur
             if (error) {
-                console.error("Erreur de chargement des posts:", error);
-                showError(`Impossible de charger les publications. Code d'erreur: ${error.code || 'inconnu'}`);
+                console.warn("Erreur de chargement des posts:", error);
                 return;
             }
 
-            renderPosts(posts || []);
+            // Vérifier s'il y a encore des posts à charger
+            hasMorePosts = posts && posts.length === postsPerPage;
+
+            if (append) {
+                // Ajouter les nouveaux posts au cache et à l'affichage
+                if (posts && posts.length > 0) {
+                    allPosts = [...allPosts, ...posts];
+                    appendPosts(posts);
+                } else if (!hasMorePosts && allPosts.length > 0) {
+                    // Afficher un message de fin
+                    const endMessage = document.createElement('div');
+                    endMessage.className = 'end-of-feed';
+                    endMessage.innerHTML = 'Vous avez vu toutes les publications disponibles.';
+                    postsFeed.appendChild(endMessage);
+                }
+            } else {
+                // Premier chargement : remplacer tout le contenu
+                allPosts = posts || [];
+                renderPosts(allPosts);
+            }
+
+            currentPage = page;
 
         } catch (error) {
-            clearTimeout(loadTimeout);
-            console.error("Erreur lors de la requête:", error);
-            showError('Erreur de connexion à la base de données.');
+            const scrollLoader = document.getElementById('scroll-loader');
+            if (scrollLoader) scrollLoader.remove();
+            
+            // Traitement silencieux des erreurs
+            console.warn("Erreur lors de la requête:", error);
+        } finally {
+            isLoading = false;
         }
     };
 
@@ -236,69 +314,109 @@
             return;
         }
 
-        postsFeed.innerHTML = posts.map(post => {
-            const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
-            const isOwner = window.currentUser && post.user_id === window.currentUser.id;
-            const canModify = isAdmin || isOwner;
-            
-            // Extraction sécurisée des données des tables liées
-            const imageUrls = post.post_images?.map(img => img.image_url).filter(url => url) || [];
-            const whatsappNumbers = post.post_whatsapp_numbers?.map(wp => wp.whatsapp_number).filter(num => num) || [];
-            const customLinks = post.post_custom_links?.filter(link => link.title && link.url) || [];
-            
-            return `
-            <div class="post-card" data-post-id="${post.id}">
-                <div class="post-header">
-                    <div class="post-author-info">
-                        <span class="post-author">${post.profiles?.email || 'Utilisateur supprimé'}</span>
-                        <small class="post-timestamp">${formatDate(post.created_at)}</small>
-                    </div>
-                    ${canModify ? `
-                    <div class="post-menu">
-                        <button class="post-menu-button" data-action="toggle-menu" title="Options">
-                            <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
-                        </button>
-                        <ul class="post-menu-dropdown">
-                            <li><button data-action="edit">Modifier</button></li>
-                            <li><button data-action="delete" class="delete-action">Supprimer</button></li>
-                        </ul>
-                    </div>
-                    ` : ''}
+        postsFeed.innerHTML = posts.map(post => generatePostHTML(post)).join('');
+    };
+
+    const appendPosts = (posts) => {
+        if (!posts || posts.length === 0) return;
+        
+        const postsHTML = posts.map(post => generatePostHTML(post)).join('');
+        postsFeed.insertAdjacentHTML('beforeend', postsHTML);
+    };
+
+    const generatePostHTML = (post) => {
+        const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
+        const isOwner = window.currentUser && post.user_id === window.currentUser.id;
+        const canModify = isAdmin || isOwner;
+        
+        // Extraction sécurisée des données des tables liées
+        const imageUrls = post.post_images?.map(img => img.image_url).filter(url => url) || [];
+        const whatsappNumbers = post.post_whatsapp_numbers?.map(wp => wp.whatsapp_number).filter(num => num) || [];
+        const customLinks = post.post_custom_links?.filter(link => link.title && link.url) || [];
+        
+        return `
+        <div class="post-card" data-post-id="${post.id}">
+            <div class="post-header">
+                <div class="post-author-info">
+                    <span class="post-author">${post.profiles?.email || 'Utilisateur supprimé'}</span>
+                    <small class="post-timestamp">${formatDate(post.created_at)}</small>
                 </div>
-                <div class="post-content">
-                    ${post.content ? `<p>${post.content}</p>` : ''}
-                    <div class="post-media-grid">
-                        ${imageUrls.map(url => `<img src="${url}" alt="Image" onerror="this.style.display='none'">`).join('')}
-                        ${post.media_url ? `<img src="${post.media_url}" alt="Média" onerror="this.style.display='none'">` : ''}
-                    </div>
-                    <div class="post-links-container">
-                        ${whatsappNumbers.map(num => `<a href="https://wa.me/${num.replace(/\D/g, '')}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
-                        ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
-                        ${customLinks.map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
-                    </div>
+                ${canModify ? `
+                <div class="post-menu">
+                    <button class="post-menu-button" data-action="toggle-menu" title="Options">
+                        <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
+                    </button>
+                    <ul class="post-menu-dropdown">
+                        <li><button data-action="edit">Modifier</button></li>
+                        <li><button data-action="delete" class="delete-action">Supprimer</button></li>
+                    </ul>
                 </div>
-                <div class="post-interactions">
-                ${window.currentUser ? `
-                    <div class="post-actions">
-                        <button class="action-btn" data-action="react" data-reaction="like" title="J'aime">👍</button>
-                        <button class="action-btn" data-action="react" data-reaction="love" title="J'adore">❤️</button>
-                        <button class="action-btn" data-action="react" data-reaction="laugh" title="Haha">🤣</button>
-                        <button class="action-btn" data-action="react" data-reaction="angry" title="Grrr">😡</button>
-                    </div>
-                    <div class="comments-section">
-                        <form class="comment-form" data-post-id="${post.id}">
-                            <input type="text" placeholder="Ajouter un commentaire..." required>
-                            <button type="submit" style="display: none;">Envoyer</button>
-                        </form>
-                    </div>
-                ` : `
-                    <p class="login-prompt"><a href="index.html">Connectez-vous</a> pour réagir ou commenter.</p>
-                `}
+                ` : ''}
+            </div>
+            <div class="post-content">
+                ${post.content ? `<p>${post.content}</p>` : ''}
+                <div class="post-media-grid">
+                    ${imageUrls.map(url => `<img src="${url}" alt="Image" onerror="this.style.display='none'">`).join('')}
+                    ${post.media_url ? `<img src="${post.media_url}" alt="Média" onerror="this.style.display='none'">` : ''}
+                </div>
+                <div class="post-links-container">
+                    ${whatsappNumbers.map(num => `<a href="https://wa.me/${num.replace(/\D/g, '')}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
+                    ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
+                    ${customLinks.map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
                 </div>
             </div>
-            `;
-        }).join('');
+            <div class="post-interactions">
+            ${window.currentUser ? `
+                <div class="post-actions">
+                    <button class="action-btn" data-action="react" data-reaction="like" title="J'aime">👍</button>
+                    <button class="action-btn" data-action="react" data-reaction="love" title="J'adore">❤️</button>
+                    <button class="action-btn" data-action="react" data-reaction="laugh" title="Haha">🤣</button>
+                    <button class="action-btn" data-action="react" data-reaction="angry" title="Grrr">😡</button>
+                </div>
+                <div class="comments-section">
+                    <form class="comment-form" data-post-id="${post.id}">
+                        <input type="text" placeholder="Ajouter un commentaire..." required>
+                        <button type="submit" style="display: none;">Envoyer</button>
+                    </form>
+                </div>
+            ` : `
+                <p class="login-prompt"><a href="index.html">Connectez-vous</a> pour réagir ou commenter.</p>
+            `}
+            </div>
+        </div>
+        `;
     };
+
+    // Fonction pour recharger complètement les posts
+    const reloadAllPosts = async () => {
+        currentPage = 0;
+        hasMorePosts = true;
+        allPosts = [];
+        await fetchPosts(0, false);
+    };
+
+    // Gestionnaire de défilement infini
+    const handleInfiniteScroll = () => {
+        // Vérifier si l'utilisateur approche du bas de la page
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        
+        // Déclencher le chargement quand il reste 500px avant la fin
+        if (scrollTop + windowHeight >= documentHeight - 500 && hasMorePosts && !isLoading) {
+            fetchPosts(currentPage + 1, true);
+        }
+    };
+
+    // Débouncer la fonction de scroll pour les performances
+    let scrollTimeout;
+    const debouncedScroll = () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(handleInfiniteScroll, 100);
+    };
+
+    // Ajouter l'écouteur de défilement
+    window.addEventListener('scroll', debouncedScroll);
 
     // Gestionnaire d'événements pour les interactions
     postsFeed.addEventListener('click', async (e) => {
@@ -331,11 +449,10 @@
                         .eq('id', postId);
                         
                     if (error) {
-                        console.error('Erreur lors de la suppression:', error);
-                        alert('Erreur lors de la suppression de la publication');
+                        console.warn('Erreur lors de la suppression:', error);
                     } else {
-                        // Rechargement automatique
-                        await fetchPosts();
+                        // Rechargement automatique sans messages d'erreur
+                        await reloadAllPosts();
                     }
                 } catch (error) {
                     console.error('Erreur:', error);
@@ -354,90 +471,4 @@
                         reaction_type: reaction
                     }]);
             } catch (error) {
-                console.warn('Erreur lors de la réaction:', error);
-            }
-        }
-    });
-    
-    // Gestionnaire pour les commentaires
-    postsFeed.addEventListener('submit', async (e) => {
-        if (!e.target.classList.contains('comment-form')) return;
-        e.preventDefault();
-        
-        const input = e.target.querySelector('input');
-        const postId = e.target.dataset.postId;
-        const content = input.value.trim();
-        
-        if (!content) return;
-        
-        try {
-            await window.supabaseClient
-                .from('comments')
-                .insert([{
-                    post_id: postId,
-                    user_id: window.currentUser.id,
-                    content: content
-                }]);
-            
-            input.value = '';
-        } catch (error) {
-            console.warn('Erreur lors du commentaire:', error);
-        }
-    });
-    
-    // Fermer les menus en cliquant ailleurs
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.post-menu')) {
-            document.querySelectorAll('.post-menu-dropdown.visible').forEach(menu => {
-                menu.classList.remove('visible');
-            });
-        }
-    });
-
-    // Chargement initial
-    await fetchPosts();
-    
-    // Abonnement aux changements en temps réel (avec gestion d'erreur)
-    try {
-        const channel = window.supabaseClient
-            .channel('posts-realtime-updates')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'posts' 
-            }, () => {
-                console.log('Mise à jour des posts détectée');
-                fetchPosts();
-            })
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'post_images' 
-            }, fetchPosts)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'post_whatsapp_numbers' 
-            }, fetchPosts)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'post_custom_links' 
-            }, fetchPosts)
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log('Abonnement temps réel activé');
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.warn('Erreur d\'abonnement temps réel');
-                }
-            });
-
-        // Stocker la référence pour nettoyage éventuel
-        if (window.realtimeSubscriptions) {
-            window.realtimeSubscriptions.push(channel);
-        }
-    } catch (error) {
-        console.warn('Impossible d\'activer le temps réel:', error);
-    }
-})();
-        </script>
+       
