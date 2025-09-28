@@ -134,17 +134,29 @@
                     pageContainer.classList.add('preloaded-page');
                     pageContainer.innerHTML = html;
                     appContent.appendChild(pageContainer);
-                } catch(e) { console.error(e); }
+                } catch(e) { 
+                    console.error(`Erreur lors du chargement de la page ${pageName}:`, e); 
+                }
             }
         };
 
         const initializeApp = async () => {
             await preloadAllPages();
-            document.querySelectorAll('.preloaded-page script').forEach(script => {
-                const newScript = document.createElement('script');
-                newScript.textContent = script.textContent;
-                document.body.appendChild(newScript).remove();
-            });
+            
+            // CORRECTION: Gestion sécurisée des scripts des pages préchargées
+            try {
+                document.querySelectorAll('.preloaded-page script').forEach(script => {
+                    if (script.textContent && script.textContent.trim()) {
+                        const newScript = document.createElement('script');
+                        newScript.textContent = script.textContent;
+                        document.body.appendChild(newScript);
+                        document.body.removeChild(newScript);
+                    }
+                });
+            } catch (error) {
+                console.error('Erreur lors de l\'exécution des scripts des pages:', error);
+            }
+            
             showPage('home');
         };
         
@@ -155,17 +167,29 @@
         });
 
         document.addEventListener('DOMContentLoaded', async () => {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { 
-                window.location.href = 'index.html';
-                return; 
+            try {
+                const savedTheme = localStorage.getItem('theme') || 'light';
+                document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+                
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (!session) { 
+                    window.location.href = 'index.html';
+                    return; 
+                }
+                
+                currentUser = session.user;
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', currentUser.id)
+                    .single();
+                    
+                currentUserProfile = profile;
+                await initializeApp();
+                
+            } catch (error) {
+                console.error('Erreur lors de l\'initialisation de l\'application:', error);
             }
-            currentUser = session.user;
-            const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
-            currentUserProfile = profile;
-            await initializeApp();
         });
 
         document.querySelector('.nav-links').addEventListener('click', (e) => {
