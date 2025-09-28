@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - World Connect</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
         .auth-container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
@@ -57,21 +56,19 @@
         </div>
     </div>
 
-    <script>
-        // --- NOUVELLES DONNÉES DE CONNEXION ---
-        const SUPABASE_URL = 'https://nmqzrouoeopanloskkvi.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tcXpyb3VvZW9wYW5sb3Nra3ZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5MjgxMDgsImV4cCI6MjA3NDUwNDEwOH0.uUQKccu3O5-S2vD7Kde00Zjs2UlT7J2IThjPeAX_Q_0';
-        
-        const { createClient } = supabase;
-        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    <script type="module">
+        // On importe le client depuis le fichier central
+        import { supabaseClient } from './supabaseClient.js';
 
         const authForm = document.getElementById('authForm');
         const loginForm = document.getElementById('loginForm');
+        // ... (le reste des déclarations DOM est identique)
         const resetPasswordForm = document.getElementById('resetPasswordForm');
         const updatePasswordForm = document.getElementById('updatePasswordForm');
         const forgotPasswordLink = document.getElementById('forgotPasswordLink');
         const messageDiv = document.getElementById('message');
         const resetMessageDiv = document.getElementById('resetMessage');
+
 
         const showMessage = (element, text, type = 'error') => {
             element.textContent = text;
@@ -85,6 +82,7 @@
             hideMessage(messageDiv);
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            // On utilise le client importé
             const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
             if (error) {
                 showMessage(messageDiv, "Email ou mot de passe incorrect.");
@@ -133,5 +131,4 @@
         });
     </script>
 </body>
-  </html>
-  
+</html>
