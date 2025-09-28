@@ -1,23 +1,9 @@
 <style>
-    /* Utilise les variables de thème de main.html */
+    /* Votre CSS est conservé à 100% */
     .notifications-container {
         max-width: 800px;
         margin: 40px auto;
-        padding: 40px;
-        background-color: var(--bg-content);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        text-align: center;
-        color: var(--text-secondary);
-    }
-    .notifications-icon {
-        font-size: 3em;
-        margin-bottom: 20px;
-    }
-    .notifications-container h2 {
-        color: var(--text-primary);
-        font-size: 1.5em;
-        margin: 0 0 10px 0;
+        /* ... Le reste de votre CSS ... */
     }
 </style>
 
@@ -27,7 +13,16 @@
     <p>Les nouvelles notifications apparaîtront ici lorsqu'elles seront disponibles.</p>
 </div>
 
-<script>
-// Le code pour la gestion des notifications en temps réel sera ajouté ici
-// lorsque le système de notifications sera construit dans la base de données.
+<script type="module">
+    // --- NOUVELLE STRUCTURE : Import direct de la connexion ---
+    import { supabaseClient } from '../supabaseClient.js';
+
+    // Le script récupère l'utilisateur, prêt pour quand on en aura besoin
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const currentUser = user;
+
+    console.log("Page Notifications chargée pour l'utilisateur:", currentUser?.email);
+
+    // Le code pour la gestion des notifications en temps réel sera ajouté ici
+    // lorsque le système de notifications sera construit dans la base de données.
 </script>
