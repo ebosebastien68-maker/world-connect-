@@ -194,7 +194,15 @@
         return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
-    // Fonction d'erreur supprimée selon les nouveaux ajustements
+    const showError = (message) => {
+        postsFeed.innerHTML = `
+            <div class="error-alert">
+                <strong>Erreur de chargement</strong><br>
+                ${message}
+                <br><button class="retry-btn" onclick="location.reload()">Réessayer</button>
+            </div>
+        `;
+    };
 
     const fetchPosts = async (page = 0, append = false) => {
         if (isLoading) return;
@@ -210,7 +218,14 @@
                 postsFeed.appendChild(loader);
             }
 
-            // Requête paginée avec collecte complète des données
+            // Timeout de 10 secondes pour les pages suivantes
+            if (!append) {
+                loadTimeout = setTimeout(() => {
+                    showError('Le chargement prend plus de temps que prévu. Vérifiez votre connexion.');
+                }, 5000);
+            }
+
+            // Requête paginée
             const from = page * postsPerPage;
             const to = from + postsPerPage - 1;
 
@@ -225,42 +240,24 @@
                     created_at,
                     profiles:user_id (
                         email,
-                        avatar_url,
-                        role
+                        avatar_url
                     ),
                     post_images (
-                        id,
                         image_url
                     ),
                     post_whatsapp_numbers (
-                        id,
                         whatsapp_number
                     ),
                     post_custom_links (
-                        id,
                         title,
                         url
-                    ),
-                    reactions (
-                        id,
-                        user_id,
-                        reaction_type,
-                        created_at
-                    ),
-                    comments (
-                        id,
-                        user_id,
-                        content,
-                        created_at,
-                        parent_comment_id,
-                        profiles:user_id (
-                            email,
-                            avatar_url
-                        )
                     )
                 `)
                 .order('created_at', { ascending: false })
                 .range(from, to);
+
+            // Annuler le timeout
+            clearTimeout(loadTimeout);
 
             // Supprimer le loader de défilement
             const scrollLoader = document.getElementById('scroll-loader');
@@ -268,9 +265,11 @@
                 scrollLoader.remove();
             }
 
-            // Traitement silencieux des erreurs - pas de messages d'erreur
             if (error) {
-                console.warn("Erreur de chargement des posts:", error);
+                console.error("Erreur de chargement des posts:", error);
+                if (!append) {
+                    showError(`Impossible de charger les publications. Code d'erreur: ${error.code || 'inconnu'}`);
+                }
                 return;
             }
 
@@ -298,11 +297,14 @@
             currentPage = page;
 
         } catch (error) {
+            clearTimeout(loadTimeout);
             const scrollLoader = document.getElementById('scroll-loader');
             if (scrollLoader) scrollLoader.remove();
             
-            // Traitement silencieux des erreurs
-            console.warn("Erreur lors de la requête:", error);
+            console.error("Erreur lors de la requête:", error);
+            if (!append) {
+                showError('Erreur de connexion à la base de données.');
+            }
         } finally {
             isLoading = false;
         }
@@ -449,9 +451,10 @@
                         .eq('id', postId);
                         
                     if (error) {
-                        console.warn('Erreur lors de la suppression:', error);
+                        console.error('Erreur lors de la suppression:', error);
+                        alert('Erreur lors de la suppression de la publication');
                     } else {
-                        // Rechargement automatique sans messages d'erreur
+                        // Rechargement automatique sans temps réel
                         await reloadAllPosts();
                     }
                 } catch (error) {
@@ -471,4 +474,54 @@
                         reaction_type: reaction
                     }]);
             } catch (error) {
-       
+                console.warn('Erreur lors de la réaction:', error);
+            }
+        }
+    });
+    
+    // Gestionnaire pour les commentaires
+    postsFeed.addEventListener('submit', async (e) => {
+        if (!e.target.classList.contains('comment-form')) return;
+        e.preventDefault();
+        
+        const input = e.target.querySelector('input');
+        const postId = e.target.dataset.postId;
+        const content = input.value.trim();
+        
+        if (!content) return;
+        
+        try {
+            await window.supabaseClient
+                .from('comments')
+                .insert([{
+                    post_id: postId,
+                    user_id: window.currentUser.id,
+                    content: content
+                }]);
+            
+            input.value = '';
+        } catch (error) {
+            console.warn('Erreur lors du commentaire:', error);
+        }
+    });
+    
+    // Fermer les menus en cliquant ailleurs
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.post-menu')) {
+            document.querySelectorAll('.post-menu-dropdown.visible').forEach(menu => {
+                menu.classList.remove('visible');
+            });
+        }
+    });
+
+    // Chargement initial
+    await fetchPosts(0, false);
+
+    // Nettoyage lors du déchargement de la page
+    window.addEventListener('beforeunload', () => {
+        window.removeEventListener('scroll', debouncedScroll);
+    });
+
+    console.log('Défilement infini activé - Synchronisation temps réel désactivée');
+})();
+</script>
