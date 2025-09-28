@@ -3,132 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World Web - Dashboard</title>
+    <title>World Connect - Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Votre CSS professionnel est conservé à 100% */
         :root {
-            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            --transition-speed: 0.3s;
-            /* ...etc... */
+            --font-family: 'Inter', system-ui, sans-serif;
+            --header-height: 110px;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --bg-main: #f1f5f9;
+            --accent-color: #3b82f6;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --header-bg: rgba(255, 255, 255, 0.7);
+            --hover-bg: rgba(0, 0, 0, 0.05);
         }
-        /* ... Le reste de votre CSS est ici ... */
+        body.dark-theme {
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --bg-main: #0f172a;
+            --accent-color: #60a5fa;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --header-bg: rgba(30, 41, 59, 0.7);
+            --hover-bg: rgba(255, 255, 255, 0.05);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+        
+        /* --- HEADER MODERNE --- */
+        .main-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px 20px;
+            background-color: var(--header-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 1000;
+            height: var(--header-height);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .header-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        #page-title {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        #site-title {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+        .header-icons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+        }
+        .nav-icon {
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .nav-icon:hover {
+            background-color: var(--hover-bg);
+            color: var(--accent-color);
+        }
+        .nav-icon.active {
+            color: var(--accent-color);
+            border-bottom: 3px solid var(--accent-color);
+            border-radius: 0;
+        }
+        .nav-icon svg {
+            width: 28px;
+            height: 28px;
+        }
+        #themeToggle {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        /* --- IFRAME POUR LE CONTENU --- */
+        #content-frame {
+            width: 100%;
+            height: calc(100vh - var(--header-height));
+            border: none;
+            margin-top: var(--header-height);
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-left">
-            <div class="navbar-title">🌍 World Web</div>
-            <h1 class="page-title" id="page-title">Accueil</h1>
+
+    <header class="main-header">
+        <div class="header-top-row">
+            <div id="page-title">Accueil</div>
+            <button id="themeToggle" title="Changer de thème">
+                <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-5.5-5.3 5.5 5.5 0 013.4-5.04A9.013 9.013 0 0012 3zm0 2a7 7 0 11.23 13.99A7.003 7.003 0 0112 5z"></path></svg>
+            </button>
+            <div id="site-title">World Connect</div>
         </div>
-        <div class="navbar-right">
-            <div class="nav-links">
-                <div class="nav-link active" data-page="home" title="Accueil">...</div>
-                <div class="nav-link" data-page="menu" title="Menu">...</div>
+        <nav class="header-icons" id="nav-icons">
+            <div class="nav-icon active" data-page="home" title="Accueil">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path></svg>
             </div>
-            <button class="theme-toggle" id="themeToggle" title="Changer de thème">...</button>
-        </div>
-    </nav>
-    <main id="app-content">
-        <div class="loader">
-            <div class="loader-spinner"></div>
-            <p>Chargement de l'application...</p>
-        </div>
+            <div class="nav-icon" data-page="messages" title="Messages">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>
+            </div>
+            <div class="nav-icon" data-page="groupes" title="Groupes">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></svg>
+            </div>
+            <div class="nav-icon" data-page="publier" title="Publier">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"></path></svg>
+            </div>
+            <div class="nav-icon" data-page="notifications" title="Notifications">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"></path></svg>
+            </div>
+            <div class="nav-icon" data-page="menu" title="Menu">
+                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path></svg>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <iframe id="content-frame" src="about:blank"></iframe>
     </main>
 
     <script type="module">
-        // --- NOUVELLE STRUCTURE : La connexion est importée ---
         import { supabaseClient } from './supabaseClient.js';
 
-        // On rend le client accessible globalement pour les mini-fichiers
-        window.supabaseClient = supabaseClient;
-        window.currentUser = null;
-        window.currentUserProfile = null;
-        
-        // Le reste de votre script, qui était déjà correct, est conservé
-        const appContent = document.getElementById('app-content');
-        const navLinks = document.querySelectorAll('.nav-link');
+        // --- DOM Elements ---
         const pageTitle = document.getElementById('page-title');
-        const pagesToPreload = ['home', 'messages', 'groupes', 'publier', 'notifications', 'menu'];
-
-        const showPage = (pageName) => {
-            document.querySelectorAll('.preloaded-page').forEach(p => p.style.display = 'none');
-            const activePage = document.getElementById(`page-${pageName}`);
-            if (activePage) {
-                activePage.style.display = 'block';
-                activePage.classList.add('page-fade-in');
-            }
-
-            navLinks.forEach(link => {
-                const isActive = link.dataset.page === pageName;
-                link.classList.toggle('active', isActive);
-                if(isActive) pageTitle.textContent = link.title;
-            });
-            
-            const initFunctionName = `initialize${pageName.charAt(0).toUpperCase() + pageName.slice(1)}Page`;
-            if (typeof window[initFunctionName] === 'function') {
-                const pageElement = document.getElementById(`page-${pageName}`);
-                if (pageElement && !pageElement.dataset.initialized) {
-                    window[initFunctionName]();
-                    pageElement.dataset.initialized = 'true';
-                }
-            }
-        };
-        
-        const preloadAllPages = async () => {
-             appContent.innerHTML = '';
-            for (const pageName of pagesToPreload) {
-                try {
-                    const response = await fetch(`./pages/${pageName}.html`);
-                    if (!response.ok) throw new Error(`Page non trouvée: ${pageName}`);
-                    const html = await response.text();
-                    const pageContainer = document.createElement('div');
-                    pageContainer.id = `page-${pageName}`;
-                    pageContainer.classList.add('preloaded-page');
-                    pageContainer.innerHTML = html;
-                    appContent.appendChild(pageContainer);
-                } catch(e) { console.error(e); }
-            }
-        };
-
-        const initializeApp = async () => {
-            await preloadAllPages();
-            document.querySelectorAll('.preloaded-page script').forEach(script => {
-                const newScript = document.createElement('script');
-                newScript.textContent = script.textContent;
-                document.body.appendChild(newScript).remove();
-            });
-            showPage('home');
-        };
-        
+        const contentFrame = document.getElementById('content-frame');
+        const navIconsContainer = document.getElementById('nav-icons');
         const themeToggle = document.getElementById('themeToggle');
+
+        // --- Gestion du Thème ---
+        const applyTheme = (theme) => {
+            document.body.classList.toggle('dark-theme', theme === 'dark');
+        };
         themeToggle.addEventListener('click', () => {
-            const isDark = document.body.classList.toggle('dark-theme');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            const isDark = document.body.classList.contains('dark-theme');
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+            applyTheme(isDark ? 'light' : 'dark');
         });
 
+        // --- Gestion de la Navigation ---
+        navIconsContainer.addEventListener('click', (e) => {
+            const navIcon = e.target.closest('.nav-icon');
+            if (!navIcon) return;
+
+            const page = navIcon.dataset.page;
+            const title = navIcon.title;
+            
+            // Mettre à jour le titre et l'iframe
+            pageTitle.textContent = title;
+            contentFrame.src = `./pages/${page}.html`;
+            
+            // Mettre à jour l'icône active
+            document.querySelector('.nav-icon.active').classList.remove('active');
+            navIcon.classList.add('active');
+        });
+
+        // --- Point d'entrée de l'Application ---
         document.addEventListener('DOMContentLoaded', async () => {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+            // Appliquer le thème sauvegardé
+            applyTheme(localStorage.getItem('theme') || 'light');
+            
+            // Le "Gardien" : vérifier si l'utilisateur est connecté
             const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) { 
+            if (!session) {
+                // Si non, renvoyer à la page de connexion
                 window.location.href = 'index.html';
-                return; 
+                return;
             }
-            window.currentUser = session.user;
-            const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', window.currentUser.id).single();
-            window.currentUserProfile = profile;
-            await initializeApp();
-        });
-
-        document.querySelector('.nav-links').addEventListener('click', (e) => {
-            const navLink = e.target.closest('.nav-link');
-            if (navLink) {
-                const page = navLink.dataset.page;
-                showPage(page);
-            }
+            
+            // Lancer la page d'accueil par défaut
+            contentFrame.src = './pages/home.html';
         });
     </script>
 </body>
