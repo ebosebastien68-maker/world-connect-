@@ -1,87 +1,294 @@
-<style>
-    /* Votre CSS professionnel et complet est conservé à 100% */
-    .publisher-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 25px;
-    }
-    /* ... Le reste de votre CSS ... */
-</style>
-
-<div class="publisher-grid">
-    <div class="main-column">
-        <form id="publishForm">
-            </form>
-    </div>
-    <div class="sidebar-column">
-        </div>
-</div>
-<div id="textEditorModal" class="text-editor-modal">
-    </div>
-
-
-<script type="module">
-    // --- NOUVELLE STRUCTURE : Import direct de la connexion ---
-    import { supabaseClient } from '../supabaseClient.js';
-
-    // Le script récupère lui-même l'utilisateur actuel
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    const currentUser = user;
-
-    if (!currentUser) {
-        document.querySelector('.publisher-grid').innerHTML = '<h2>Vous devez être connecté pour publier.</h2>';
-        // Arrêter l'exécution si aucun utilisateur n'est connecté
-        throw new Error("Utilisateur non connecté");
-    }
-
-    // Le reste de votre script, qui était déjà parfaitement fonctionnel, est conservé
-    let postDraft = { content: "", localFile: null, imageUrls: Array(5).fill(""), whatsappNumbers: Array(3).fill(""), buyLink: "", customLinks: Array(7).fill({ title: "", url: "" }) };
-    let editMode = false;
-    let postIdToUpdate = null;
-
-    const form = document.getElementById('publishForm');
-    const publishButton = document.getElementById('publishButton');
-    const publishStatus = document.getElementById('publishStatus');
-    // ... (déclaration de tous vos autres éléments DOM)
-    
-    function createInputs(containerId, count, placeholders) {
-        // ... (votre fonction createInputs est conservée)
-    }
-    createInputs('imageUrlsContainer', 5, ['URL de l\'image']);
-    createInputs('whatsappContainer', 3, ['Numéro WhatsApp (ex: 229...)']);
-    createInputs('customLinksContainer', 7, ['URL du lien', 'Titre du bouton']);
-
-    // ... (tous vos event listeners pour le modal, les inputs, etc. sont conservés)
-
-    // Logique pour le mode édition
-    const params = new URLSearchParams(window.location.hash.split('?')[1]);
-    postIdToUpdate = params.get('edit');
-
-    if (postIdToUpdate) {
-        editMode = true;
-        publishButton.textContent = "Mettre à jour l'Article";
-        
-        // La récupération des données pour le mode édition est conservée
-        const { data: postToEdit } = await supabaseClient.from('posts').select('*').eq('id', postIdToUpdate).single();
-        const { data: postImages } = await supabaseClient.from('post_images').select('image_url').eq('post_id', postIdToUpdate);
-        const { data: postWhatsApp } = await supabaseClient.from('post_whatsapp_numbers').select('whatsapp_number').eq('post_id', postIdToUpdate);
-        const { data: postLinks } = await supabaseClient.from('post_custom_links').select('title, url').eq('post_id', postIdToUpdate);
-        
-        if (postToEdit) {
-            // ... (logique de remplissage du formulaire conservée)
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Publier</title>
+    <style>
+        /* Le design s'adapte au thème de main.html car il est dans un iframe */
+        body {
+            font-family: var(--font-family, 'Inter', sans-serif);
+            background-color: transparent;
+            color: var(--text-primary, #1e293b);
         }
-    }
+        .publisher-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+        .card {
+            background-color: var(--bg-card, #ffffff);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 1px 2px var(--shadow-color, rgba(0,0,0,0.05));
+        }
+        .card-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: var(--text-primary);
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group input {
+            width: 100%; padding: 12px; border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 8px; background-color: var(--bg-main, #f8fafc);
+            color: var(--text-primary); font-size: 1em;
+        }
+        .custom-link-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        #editTextButton {
+            width: 100%; padding: 15px; font-size: 1em; font-weight: 500;
+            background-color: transparent; color: var(--accent-color, #3b82f6);
+            border: 2px dashed var(--accent-color, #3b82f6); cursor: pointer; border-radius: 8px;
+            transition: all 0.2s;
+        }
+        #editTextButton:hover { background-color: var(--accent-color, #3b82f6); color: white; }
+        #textPreview { color: var(--text-secondary, #64748b); margin-bottom: 15px; white-space: pre-wrap; word-break: break-word; }
+        #localFileInput { display: none; }
+        #fileUploadLabel { display: block; padding: 20px; text-align: center; border: 2px dashed var(--border-color, #e2e8f0); border-radius: 8px; cursor: pointer; }
+        #fileUploadLabel:hover { border-color: var(--accent-color, #3b82f6); }
+        #fileName { color: var(--accent-color, #3b82f6); font-weight: 500; margin-top: 10px; font-size: 0.9em; }
+        .accordion details { margin-bottom: 10px; }
+        .accordion summary { font-weight: 600; padding: 15px; cursor: pointer; border-radius: 8px; background-color: var(--bg-main, #f8fafc); list-style: none; position: relative; }
+        .accordion summary::after { content: '›'; position: absolute; right: 15px; font-size: 1.5em; transform: rotate(90deg); transition: transform 0.2s; }
+        .accordion details[open] summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+        .accordion details[open] summary::after { transform: rotate(-90deg); }
+        .accordion-content { padding: 20px; border: 1px solid var(--border-color, #e2e8f0); border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+        .publish-actions { padding: 20px 0; }
+        .btn-publish-final { width: 100%; padding: 15px; font-size: 1.1em; font-weight: 600; background-color: var(--success-color, #10b981); color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .text-editor-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .text-editor-content { background: var(--bg-card, white); width: 95%; height: 90%; display: flex; flex-direction: column; border-radius: 8px; }
+        .text-editor-content textarea { flex-grow: 1; border: none; padding: 20px; font-size: 1.1em; resize: none; background: transparent; color: var(--text-primary); }
+        .text-editor-actions { padding: 10px; text-align: right; border-top: 1px solid var(--border-color, #e2e8f0); }
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; }
+        .btn-primary { background-color: var(--accent-color, #3b82f6); color: white; }
+        @media (max-width: 900px) { .publisher-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="publisher-grid">
+        <div class="main-column">
+            <form id="publishForm">
+                <div class="card">
+                    <h2 class="card-title">Contenu Principal</h2>
+                    <div id="textPreview">Aucun texte pour le moment.</div>
+                    <button type="button" id="editTextButton">Écrire / Modifier le Texte</button>
+                </div>
+                <div class="card">
+                    <h2 class="card-title">Média Local</h2>
+                    <label for="localFileInput" id="fileUploadLabel">
+                        <span>Cliquez ou glissez un fichier ici</span>
+                        <div id="fileName"></div>
+                    </label>
+                    <input type="file" id="localFileInput" accept="image/*,video/*">
+                </div>
+            </form>
+        </div>
+        <div class="sidebar-column">
+            <div class="card">
+                <h2 class="card-title">Options de Publication</h2>
+                <div class="accordion">
+                    <details>
+                        <summary>Images Externes</summary>
+                        <div class="accordion-content" id="imageUrlsContainer"></div>
+                    </details>
+                    <details>
+                        <summary>Liens WhatsApp</summary>
+                        <div class="accordion-content" id="whatsappContainer"></div>
+                    </details>
+                    <details>
+                        <summary>Lien d'Action (Acheter)</summary>
+                        <div class="accordion-content">
+                            <input type="url" id="buyLinkInput" placeholder="https://lienproduit.com">
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Liens Personnalisés</summary>
+                        <div class="accordion-content" id="customLinksContainer"></div>
+                    </details>
+                </div>
+            </div>
+            <div class="publish-actions">
+                <button type="submit" form="publishForm" class="btn-publish-final" id="publishButton">Publier l'Article</button>
+                <div id="publishStatus" style="text-align:center; margin-top:10px;"></div>
+            </div>
+        </div>
+    </div>
+    <div id="textEditorModal" class="text-editor-modal">
+        <div class="text-editor-content">
+            <textarea id="mainContentTextarea" maxlength="125000" placeholder="Écrivez votre article ici..."></textarea>
+            <div class="text-editor-actions">
+                <button type="button" id="saveTextButton" class="btn btn-primary">Sauvegarder et Fermer</button>
+            </div>
+        </div>
+    </div>
 
-    function updateUIFromDraft() {
-        // ... (votre fonction updateUIFromDraft est conservée)
-    }
+    <script type="module">
+        import { supabaseClient } from '../supabaseClient.js';
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        // ... (toute votre logique de soumission, d'upload, de création et de mise à jour est conservée)
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        const currentUser = user;
+
+        if (!currentUser) {
+            document.querySelector('.publisher-grid').innerHTML = '<h2>Vous devez être connecté pour publier.</h2>';
+            throw new Error("Utilisateur non connecté");
+        }
+
+        let postDraft = { content: "", localFile: null, imageUrls: Array(5).fill(""), whatsappNumbers: Array(3).fill(""), buyLink: "", customLinks: Array(7).fill({ title: "", url: "" }) };
+        let editMode = false;
+        let postIdToUpdate = null;
+
+        const form = document.getElementById('publishForm');
+        const publishButton = document.getElementById('publishButton');
+        const publishStatus = document.getElementById('publishStatus');
+        const textEditorModal = document.getElementById('textEditorModal');
+        const editTextButton = document.getElementById('editTextButton');
+        const saveTextButton = document.getElementById('saveTextButton');
+        const mainContentTextarea = document.getElementById('mainContentTextarea');
+        const textPreview = document.getElementById('textPreview');
+        const localFileInput = document.getElementById('localFileInput');
+        const fileNameDisplay = document.getElementById('fileName');
         
-        // Exemple d'une ligne de code à l'intérieur qui est maintenant correcte :
-        // const { data: newPost, error: insertError } = await supabaseClient.from('posts').insert(finalData).select('id').single();
-    });
+        function createInputs(containerId, count, placeholders) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                if (placeholders.length === 2) {
+                    const group = document.createElement('div');
+                    group.className = 'custom-link-group form-group';
+                    group.innerHTML = `<input type="url" data-type="customLinks" data-index="${i}" data-field="url" placeholder="${placeholders[0]} ${i + 1}"><input type="text" maxlength="20" data-type="customLinks" data-index="${i}" data-field="title" placeholder="${placeholders[1]} ${i + 1}">`;
+                    container.appendChild(group);
+                } else {
+                    const group = document.createElement('div');
+                    group.className = 'form-group';
+                    group.innerHTML = `<input type="text" data-type="${containerId}" data-index="${i}" placeholder="${placeholders[0]} ${i + 1}">`;
+                    container.appendChild(group);
+                }
+            }
+        }
+        createInputs('imageUrlsContainer', 5, ['URL de l\'image']);
+        createInputs('whatsappContainer', 3, ['Numéro WhatsApp (ex: 229...)']);
+        createInputs('customLinksContainer', 7, ['URL du lien', 'Titre du bouton']);
 
-</script>
+        editTextButton.addEventListener('click', () => {
+            mainContentTextarea.value = postDraft.content;
+            textEditorModal.style.display = 'flex';
+        });
+        saveTextButton.addEventListener('click', () => {
+            postDraft.content = mainContentTextarea.value;
+            textPreview.textContent = postDraft.content ? (postDraft.content.substring(0, 200) + (postDraft.content.length > 200 ? '...' : '')) : "Aucun texte pour le moment.";
+            textEditorModal.style.display = 'none';
+        });
+
+        document.querySelector('.publisher-grid').addEventListener('input', (e) => {
+            const target = e.target;
+            if (target.id === 'localFileInput') {
+                postDraft.localFile = target.files[0] || null;
+                fileNameDisplay.textContent = postDraft.localFile ? `Fichier : ${postDraft.localFile.name}` : '';
+                return;
+            }
+            if (target.id === 'buyLinkInput') { postDraft.buyLink = target.value; return; }
+            const dataType = target.dataset.type;
+            const index = parseInt(target.dataset.index, 10);
+            if (dataType === 'imageUrlsContainer') postDraft.imageUrls[index] = target.value;
+            if (dataType === 'whatsappContainer') postDraft.whatsappNumbers[index] = target.value;
+            if (dataType === 'customLinks') { postDraft.customLinks[index] = { ...postDraft.customLinks[index], [target.dataset.field]: target.value }; }
+        });
+
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        postIdToUpdate = params.get('edit');
+
+        if (postIdToUpdate) {
+            editMode = true;
+            publishButton.textContent = "Mettre à jour l'Article";
+            
+            const { data: postToEdit } = await supabaseClient.from('posts').select('*').eq('id', postIdToUpdate).single();
+            const { data: postImages } = await supabaseClient.from('post_images').select('image_url').eq('post_id', postIdToUpdate);
+            const { data: postWhatsApp } = await supabaseClient.from('post_whatsapp_numbers').select('whatsapp_number').eq('post_id', postIdToUpdate);
+            const { data: postLinks } = await supabaseClient.from('post_custom_links').select('title, url').eq('post_id', postIdToUpdate);
+            
+            if (postToEdit) {
+                postDraft.content = postToEdit.content || "";
+                postDraft.imageUrls = (postImages?.map(img => img.image_url) || []).concat(Array(5).fill("")).slice(0, 5);
+                postDraft.whatsappNumbers = (postWhatsApp?.map(wp => wp.whatsapp_number) || []).concat(Array(3).fill("")).slice(0, 3);
+                postDraft.buyLink = postToEdit.buy_link || "";
+                postDraft.customLinks = (postLinks?.map(link => ({title: link.title, url: link.url})) || []).concat(Array(7).fill({title:"",url:""})).slice(0, 7);
+                updateUIFromDraft();
+            }
+        }
+
+        function updateUIFromDraft() {
+            textPreview.textContent = postDraft.content ? (postDraft.content.substring(0, 200) + '...') : "Aucun texte pour le moment.";
+            document.querySelectorAll('[data-type="imageUrlsContainer"]').forEach((input, i) => input.value = postDraft.imageUrls[i]);
+            document.querySelectorAll('[data-type="whatsappContainer"]').forEach((input, i) => input.value = postDraft.whatsappNumbers[i]);
+            document.getElementById('buyLinkInput').value = postDraft.buyLink;
+            document.querySelectorAll('[data-type="customLinks"]').forEach(input => {
+                const index = input.dataset.index;
+                input.value = postDraft.customLinks[index]?.[input.dataset.field] || "";
+            });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            publishStatus.textContent = editMode ? 'Mise à jour...' : 'Publication...';
+            let mediaPublicUrl = null;
+
+            if (postDraft.localFile) {
+                const file = postDraft.localFile;
+                const filePath = `public/${currentUser.id}/${Date.now()}-${file.name}`;
+                const { error: uploadError } = await supabaseClient.storage.from('media').upload(filePath, file);
+                if (uploadError) { publishStatus.textContent = `Erreur d'upload: ${uploadError.message}`; return; }
+                mediaPublicUrl = supabaseClient.storage.from('media').getPublicUrl(filePath).data.publicUrl;
+            }
+
+            const finalData = { user_id: currentUser.id, content: postDraft.content, buy_link: postDraft.buyLink };
+            if (mediaPublicUrl) { finalData.media_url = mediaPublicUrl; }
+            
+            let error;
+            let postId;
+            
+            if (editMode) {
+                const { error: updateError } = await supabaseClient.from('posts').update(finalData).eq('id', postIdToUpdate);
+                error = updateError;
+                postId = postIdToUpdate;
+                
+                if (!error) {
+                    await supabaseClient.from('post_images').delete().eq('post_id', postId);
+                    await supabaseClient.from('post_whatsapp_numbers').delete().eq('post_id', postId);
+                    await supabaseClient.from('post_custom_links').delete().eq('post_id', postId);
+                }
+            } else {
+                const { data: newPost, error: insertError } = await supabaseClient.from('posts').insert(finalData).select('id').single();
+                error = insertError;
+                postId = newPost?.id;
+            }
+
+            if (error) { publishStatus.textContent = `Erreur: ${error.message}`; console.error(error); return; }
+
+            const imageData = postDraft.imageUrls.filter(url => url).map(url => ({ post_id: postId, image_url: url }));
+            const whatsappData = postDraft.whatsappNumbers.filter(num => num).map(num => ({ post_id: postId, whatsapp_number: num }));
+            const linksData = postDraft.customLinks.filter(link => link.url && link.title).map(link => ({ post_id: postId, title: link.title, url: link.url }));
+
+            const insertPromises = [];
+            if (imageData.length > 0) insertPromises.push(supabaseClient.from('post_images').insert(imageData));
+            if (whatsappData.length > 0) insertPromises.push(supabaseClient.from('post_whatsapp_numbers').insert(whatsappData));
+            if (linksData.length > 0) insertPromises.push(supabaseClient.from('post_custom_links').insert(linksData));
+
+            if (insertPromises.length > 0) {
+                const results = await Promise.all(insertPromises);
+                const hasError = results.some(result => result.error);
+                if (hasError) {
+                    publishStatus.textContent = 'Erreur lors de l\'insertion des données liées';
+                    return;
+                }
+            }
+
+            publishStatus.textContent = editMode ? 'Article mis à jour !' : 'Article publié !';
+            setTimeout(() => {
+                // Pour une SPA, on change le hash pour naviguer
+                if (window.top) window.top.location.hash = '#home';
+            }, 1500);
+        });
+    </script>
+</body>
+</html>
