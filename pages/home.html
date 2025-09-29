@@ -2,10 +2,10 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
     <title>Accueil</title>
     <style>
-        /* ... (votre CSS précédent est ici, avec cet ajout) ... */
+        /* Votre CSS professionnel est conservé à 100% */
         .post-footer {
             padding: 10px 20px;
             background-color: var(--hover-bg, #f1f5f9);
@@ -42,13 +42,7 @@
 
         const { data: { user } } = await supabaseClient.auth.getUser();
         const currentUser = user;
-        let currentUserProfile = null;
         
-        if (currentUser) {
-            const { data } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
-            currentUserProfile = data;
-        }
-
         function formatDate(dateString) {
             const date = new Date(dateString);
             const now = new Date();
@@ -85,7 +79,6 @@
         };
 
         const generatePostHTML = (post) => {
-            const isAdmin = currentUserProfile?.role === 'admin';
             const authorEmail = post.profiles?.email || 'Anonyme';
             const avatarInitial = authorEmail.charAt(0).toUpperCase();
 
@@ -102,7 +95,7 @@
                             <small class="post-timestamp">${formatDate(post.created_at)}</small>
                         </div>
                     </div>
-                    ${isAdmin ? `
+                    ${currentUser ? `
                     <div class="post-menu">
                         <button class="post-menu-button" data-action="toggle-menu" title="Options">
                            <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
@@ -152,13 +145,12 @@
         });
 
         postsFeed.addEventListener('click', async (e) => {
-            e.preventDefault(); // Pour éviter que le lien #commentaire ne change l'URL tout de suite
+            e.preventDefault();
             const target = e.target;
             const reactionItem = target.closest('.reaction-item');
             const menuButton = target.closest('.post-menu-button');
             const actionButton = target.closest('.post-menu-dropdown button');
             const commentLink = target.closest('.comment-button');
-
             const postCard = target.closest('.post-card');
             const postId = postCard?.dataset.postId;
 
@@ -177,7 +169,11 @@
                     window.top.location.hash = `#publier?edit=${postId}`;
                 } else if (action === 'delete') {
                     if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
-                        await supabaseClient.from('posts').delete().eq('id', postId);
+                        const { error } = await supabaseClient.from('posts').delete().eq('id', postId);
+                        if (error) {
+                            alert("Action non autorisée. Seuls les administrateurs peuvent supprimer des articles.");
+                            console.error(error);
+                        }
                     }
                 }
             } else if (commentLink) {
