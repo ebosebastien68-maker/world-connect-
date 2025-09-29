@@ -9,9 +9,12 @@
     </style>
 </head>
 <body>
+
     <div class="home-container">
         <header class="home-header">
-            <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="..."></path></svg>
+            <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24">
+                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
+            </svg>
             <input type="text" id="searchInput" placeholder="Rechercher des articles...">
         </header>
         <div id="posts-feed"></div>
@@ -26,10 +29,32 @@
 
         const { data: { user } } = await supabaseClient.auth.getUser();
         const currentUser = user;
+        let currentUserProfile = null; // Initialisé à null
         
-        function formatDate(dateString) { /* ... (Fonction date identique) ... */ }
+        // On récupère le profil une seule fois au début
+        if (currentUser) {
+            const { data: profile, error } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
+            if (error) {
+                console.warn("Impossible de récupérer le profil utilisateur:", error.message);
+            } else {
+                currentUserProfile = profile;
+            }
+        }
+        
+        function formatDate(dateString) {
+             const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.round((now - date) / 1000);
+            if (seconds < 60) return `à l'instant`;
+            const minutes = Math.round(seconds / 60);
+            if (minutes < 60) return `il y a ${minutes} min`;
+            const hours = Math.round(minutes / 60);
+            if (hours < 24) return `il y a ${hours} h`;
+            const days = Math.round(hours / 24);
+            if (days < 7) return `il y a ${days} j`;
+            return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
 
-        // --- CORRECTION DE LA REQUÊTE POUR ÊTRE CONFORME AU SQL V7 ---
         const fetchPosts = async (searchTerm = '') => {
             let query = supabaseClient
                 .from('posts')
@@ -44,7 +69,7 @@
                 .order('created_at', { ascending: false });
 
             if (searchTerm) {
-                query = query.textSearch('content', searchTerm, { type: 'websearch', config: 'french' });
+                query = query.textSearch('content', `'${searchTerm}'`, { type: 'websearch', config: 'french' });
             }
 
             const { data: posts, error } = await query;
@@ -63,8 +88,7 @@
         };
 
         const generatePostHTML = (post) => {
-            // --- CORRECTION : On ne vérifie plus le rôle, seulement si l'utilisateur est connecté ---
-            const showAdminMenu = currentUser; // Le menu s'affiche pour tout utilisateur connecté
+            const showAdminMenu = currentUserProfile?.role === 'admin';
             const authorEmail = post.profiles?.email || 'Anonyme';
             const avatarInitial = authorEmail.charAt(0).toUpperCase();
 
@@ -92,7 +116,6 @@
                         </ul>
                     </div>` : ''}
                 </div>
-
                 <div class="post-content">
                     <p>${post.content || ''}</p>
                     <div class="post-media-grid">
@@ -106,7 +129,6 @@
                         ${(post.post_custom_links || []).map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
                     </div>
                 </div>
-
                 <div class="post-reactions-bar">
                     ${['👍', '❤️', '🤣', '😡'].map(emoji => `
                         <div class="reaction-item ${userReaction === emoji ? 'user-reacted' : ''}" data-action="react" data-reaction="${emoji}">
@@ -115,15 +137,68 @@
                         </div>
                     `).join('')}
                 </div>
-
                 <div class="post-footer">
                     <a href="#commentaire?post=${post.id}" class="comment-button">Commentaires</a>
                 </div>
             </div>`;
         };
+
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                fetchPosts(e.target.value.trim());
+            }, 500);
+        });
+
+        postsFeed.addEventListener('click', async (e) => {
+            const target = e.target;
+            const reactionItem = target.closest('.reaction-item');
+            const menuButton = target.closest('.post-menu-button');
+            const actionButton = target.closest('.post-menu-dropdown button');
+            const commentLink = target.closest('.comment-button');
+            const postCard = target.closest('.post-card');
+            const postId = postCard?.dataset.postId;
+
+            if (commentLink) {
+                e.preventDefault();
+                window.top.location.hash = commentLink.getAttribute('href').substring(1);
+                return;
+            }
+            if (!currentUser) return; // Seuls les utilisateurs connectés peuvent interagir
+
+            if (reactionItem) {
+                const reaction = reactionItem.dataset.reaction;
+                if (reactionItem.classList.contains('user-reacted')) {
+                    await supabaseClient.from('reactions').delete().match({ post_id: postId, user_id: currentUser.id });
+                } else {
+                    await supabaseClient.from('reactions').upsert({ post_id: postId, user_id: currentUser.id, reaction_type: reaction });
+                }
+            } else if (menuButton) {
+                menuButton.nextElementSibling.classList.toggle('visible');
+             } else if (actionButton) {
+                const action = actionButton.dataset.action;
+                if (action === 'edit') {
+                    window.top.location.hash = `#publier?edit=${postId}`;
+                } else if (action === 'delete') {
+                    if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
+                        const { error } = await supabaseClient.from('posts').delete().eq('id', postId);
+                        if (error) {
+                            alert("Action non autorisée. Votre rôle ne permet pas cette action.");
+                            console.error(error);
+                        }
+                    }
+                }
+            }
+        });
         
-        // ... (le reste du script est identique)
-        
+        await fetchPosts();
+        supabaseClient.channel('db-changes-realtime')
+            .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+                console.log("Changement détecté, mise à jour du fil d'actualité.");
+                fetchPosts(searchInput.value.trim());
+            })
+            .subscribe();
     </script>
 </body>
 </html>
