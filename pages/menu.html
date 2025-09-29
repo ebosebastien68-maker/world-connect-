@@ -1,36 +1,81 @@
-<style>
-    /* Votre CSS est conservé à 100% */
-    .menu-container {
-        max-width: 600px;
-        margin: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-    }
-    /* ... Le reste de votre CSS ... */
-</style>
-
-<div class="menu-container">
-    <button class="menu-item" id="profileButton" disabled>Mon Profil (bientôt)</button>
-    <button class="menu-item" id="settingsButton" disabled>Paramètres (bientôt)</button>
-    <button class="menu-item logout-btn" id="logoutButton">Déconnexion</button>
-</div>
-
-<script type="module">
-    // --- NOUVELLE STRUCTURE : Import direct de la connexion ---
-    import { supabaseClient } from '../supabaseClient.js';
-
-    const logoutButton = document.getElementById('logoutButton');
-    if (!logoutButton) throw new Error("Bouton de déconnexion non trouvé");
-
-    logoutButton.addEventListener('click', async () => {
-        if (confirm("Êtes-vous sûr de vouloir vous déconnecter ?")) {
-            const { error } = await supabaseClient.auth.signOut();
-            if (error) {
-                alert("Erreur lors de la déconnexion: " + error.message);
-            } else {
-                window.location.href = 'index.html';
-            }
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu</title>
+    <style>
+        /* Styles pour s'adapter au thème de main.html */
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: transparent;
+            color: var(--text-primary, #1e293b);
+            padding: 20px;
         }
-    });
-</script>
+        .menu-container {
+            max-width: 600px;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .menu-item {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            background-color: var(--bg-card, #ffffff);
+            border: 1px solid var(--border-color, #e2e8f0);
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 500;
+            text-align: left;
+            cursor: pointer;
+            color: var(--text-primary, #1e293b);
+            transition: all 0.2s;
+        }
+        .menu-item:hover {
+            border-color: var(--accent-color, #3b82f6);
+            color: var(--accent-color, #3b82f6);
+            transform: translateY(-2px);
+        }
+        .logout-btn {
+            background-color: #ef4444;
+            color: white;
+            font-weight: bold;
+        }
+        .logout-btn:hover {
+            background-color: #dc2626;
+            border-color: #dc2626;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="menu-container">
+        <button class="menu-item" id="profileButton" disabled>Mon Profil (bientôt disponible)</button>
+        <button class="menu-item" id="settingsButton" disabled>Paramètres (bientôt disponible)</button>
+        <button class="menu-item logout-btn" id="logoutButton">Déconnexion</button>
+    </div>
+
+    <script type="module">
+        // Ce widget importe lui-même la connexion
+        import { supabaseClient } from '../supabaseClient.js';
+
+        const logoutButton = document.getElementById('logoutButton');
+
+        logoutButton.addEventListener('click', async () => {
+            if (confirm("Êtes-vous sûr de vouloir vous déconnecter ?")) {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) {
+                    alert("Erreur lors de la déconnexion : " + error.message);
+                } else {
+                    // Important : On utilise 'window.top.location.href' pour changer l'URL
+                    // de la page principale (main.html) et non juste de l'iframe.
+                    window.top.location.href = '/index.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
