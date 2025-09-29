@@ -1,249 +1,194 @@
-<style>
-    /* Votre CSS professionnel et complet est conservé à 100% */
-    .home-container { max-width: 750px; margin: auto; padding: 0 10px; }
-    /* ... (le reste de votre CSS) */
-</style>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accueil</title>
+    <style>
+        /* ... (votre CSS précédent est ici, avec cet ajout) ... */
+        .post-footer {
+            padding: 10px 20px;
+            background-color: var(--hover-bg, #f1f5f9);
+            border-top: 1px solid var(--border-color, #e9ebee);
+        }
+        .comment-button {
+            background: none; border: none; padding: 8px; font-weight: 600;
+            color: var(--text-secondary, #65676b); cursor: pointer;
+            border-radius: 8px; width: 100%; text-align: center;
+            text-decoration: none; display: block;
+        }
+        .comment-button:hover {
+            background-color: var(--active-bg, #e2e8f0);
+        }
+    </style>
+</head>
+<body>
 
-<div class="home-container" id="posts-feed">
-    <div class="loading-message">
-        <div class="loading-spinner"></div>
-        Chargement des publications...
+    <div class="home-container">
+        <header class="home-header">
+            <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg>
+            <input type="text" id="searchInput" placeholder="Rechercher des articles...">
+        </header>
+        <div id="posts-feed">
+            </div>
     </div>
-</div>
 
-<script type="module">
-    // --- NOUVELLE STRUCTURE : Import direct de la connexion ---
-    import { supabaseClient } from '../supabaseClient.js';
+    <script type="module">
+        import { supabaseClient } from '../supabaseClient.js';
 
-    const postsFeed = document.getElementById('posts-feed');
-    if (!postsFeed) throw new Error("Element #posts-feed non trouvé");
+        const postsFeed = document.getElementById('posts-feed');
+        const searchInput = document.getElementById('searchInput');
+        if (!postsFeed || !searchInput) throw new Error("Éléments HTML manquants");
 
-    // Le script récupère lui-même l'utilisateur actuel
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    const currentUser = user;
-    let currentUserProfile = null;
-    
-    // Variables pour la pagination et le défilement infini (conservées)
-    let currentPage = 0;
-    const postsPerPage = 10;
-    let isLoading = false;
-    let hasMorePosts = true;
-    let allPosts = [];
-
-    if (currentUser) {
-        try {
-            const { data } = await supabaseClient
-                .from('profiles')
-                .select('role')
-                .eq('id', currentUser.id)
-                .single();
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        const currentUser = user;
+        let currentUserProfile = null;
+        
+        if (currentUser) {
+            const { data } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
             currentUserProfile = data;
-        } catch (error) {
-            console.warn('Impossible de récupérer le profil utilisateur:', error);
-        }
-    }
-
-    function formatDate(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const seconds = Math.round((now - date) / 1000);
-        if (seconds < 60) return `à l'instant`;
-        const minutes = Math.round(seconds / 60);
-        if (minutes < 60) return `il y a ${minutes} min`;
-        const hours = Math.round(minutes / 60);
-        if (hours < 24) return `il y a ${hours} h`;
-        const days = Math.round(hours / 24);
-        if (days < 7) return `il y a ${days} j`;
-        return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-
-    const fetchPosts = async (page = 0, append = false) => {
-        if (isLoading || !hasMorePosts) return;
-        isLoading = true;
-        
-        if (append && !document.getElementById('scroll-loader')) {
-            const loader = document.createElement('div');
-            loader.className = 'infinite-scroll-loader';
-            loader.innerHTML = '<div class="loading-spinner"></div>';
-            postsFeed.appendChild(loader);
         }
 
-        try {
-            const from = page * postsPerPage;
-            const to = from + postsPerPage - 1;
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.round((now - date) / 1000);
+            if (seconds < 60) return `à l'instant`;
+            const minutes = Math.round(seconds / 60);
+            if (minutes < 60) return `il y a ${minutes} min`;
+            const hours = Math.round(minutes / 60);
+            if (hours < 24) return `il y a ${hours} h`;
+            const days = Math.round(hours / 24);
+            if (days < 7) return `il y a ${days} j`;
+            return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
 
-            const { data: posts, error } = await supabaseClient
+        const fetchPosts = async (searchTerm = '') => {
+            let query = supabaseClient
                 .from('posts')
-                .select(`
-                    id, content, media_url, buy_link, created_at,
-                    profiles ( email, avatar_url ),
-                    post_images ( image_url ),
-                    post_whatsapp_numbers ( whatsapp_number ),
-                    post_custom_links ( title, url )
-                `)
-                .order('created_at', { ascending: false })
-                .range(from, to);
+                .select(`*, profiles(email), post_images(image_url), post_whatsapp_numbers(whatsapp_number), post_custom_links(title, url), reactions(reaction_type, user_id)`)
+                .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (searchTerm) {
+                query = query.textSearch('content', searchTerm, { type: 'websearch', config: 'french' });
+            }
 
-            hasMorePosts = posts.length === postsPerPage;
+            const { data: posts, error } = await query;
+            if (error) { console.error(error); return; }
+            renderPosts(posts);
+        };
 
-            if (append) {
-                if (posts.length > 0) {
-                    allPosts = [...allPosts, ...posts];
-                    appendPosts(posts);
+        const renderPosts = (posts) => {
+            postsFeed.innerHTML = !posts || posts.length === 0
+                ? '<p style="text-align:center; padding: 20px;">Aucun article trouvé.</p>'
+                : posts.map(post => generatePostHTML(post)).join('');
+        };
+
+        const generatePostHTML = (post) => {
+            const isAdmin = currentUserProfile?.role === 'admin';
+            const authorEmail = post.profiles?.email || 'Anonyme';
+            const avatarInitial = authorEmail.charAt(0).toUpperCase();
+
+            const reactionsCount = (post.reactions || []).reduce((acc, r) => { acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1; return acc; }, {});
+            const userReaction = currentUser ? (post.reactions || []).find(r => r.user_id === currentUser.id)?.reaction_type : null;
+            
+            return `
+            <div class="post-card" data-post-id="${post.id}">
+                <div class="post-header">
+                    <div class="post-author-info">
+                        <div class="avatar">${avatarInitial}</div>
+                        <div>
+                            <span class="post-author">${authorEmail}</span>
+                            <small class="post-timestamp">${formatDate(post.created_at)}</small>
+                        </div>
+                    </div>
+                    ${isAdmin ? `
+                    <div class="post-menu">
+                        <button class="post-menu-button" data-action="toggle-menu" title="Options">
+                           <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
+                        </button>
+                        <ul class="post-menu-dropdown">
+                            <li><button data-action="edit">Modifier</button></li>
+                            <li><button data-action="delete" class="delete-action">Supprimer</button></li>
+                        </ul>
+                    </div>` : ''}
+                </div>
+
+                <div class="post-content">
+                    <p>${post.content || ''}</p>
+                    <div class="post-media-grid">
+                        ${(post.media_url ? [`<img src="${post.media_url}" alt="Média">`] : []).concat(
+                            (post.post_images || []).map(img => `<img src="${img.image_url}" alt="Image">`)
+                        ).join('')}
+                    </div>
+                    <div class="post-links-container">
+                         ${(post.post_whatsapp_numbers || []).map(wp => `<a href="https://wa.me/${wp.whatsapp_number}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
+                        ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
+                        ${(post.post_custom_links || []).map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
+                    </div>
+                </div>
+
+                <div class="post-reactions-bar">
+                    ${['👍', '❤️', '🤣', '😡'].map(emoji => `
+                        <div class="reaction-item ${userReaction === emoji ? 'user-reacted' : ''}" data-action="react" data-reaction="${emoji}">
+                            <span>${emoji}</span>
+                            <span>${reactionsCount[emoji] || 0}</span>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="post-footer">
+                    <a href="#commentaire?post=${post.id}" class="comment-button">Commentaires</a>
+                </div>
+            </div>`;
+        };
+
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                fetchPosts(e.target.value.trim());
+            }, 500);
+        });
+
+        postsFeed.addEventListener('click', async (e) => {
+            e.preventDefault(); // Pour éviter que le lien #commentaire ne change l'URL tout de suite
+            const target = e.target;
+            const reactionItem = target.closest('.reaction-item');
+            const menuButton = target.closest('.post-menu-button');
+            const actionButton = target.closest('.post-menu-dropdown button');
+            const commentLink = target.closest('.comment-button');
+
+            const postCard = target.closest('.post-card');
+            const postId = postCard?.dataset.postId;
+
+            if (reactionItem && currentUser) {
+                const reaction = reactionItem.dataset.reaction;
+                if (reactionItem.classList.contains('user-reacted')) {
+                    await supabaseClient.from('reactions').delete().match({ post_id: postId, user_id: currentUser.id });
+                } else {
+                    await supabaseClient.from('reactions').upsert({ post_id: postId, user_id: currentUser.id, reaction_type: reaction });
                 }
-            } else {
-                allPosts = posts || [];
-                renderPosts(allPosts);
+            } else if (menuButton) {
+                menuButton.nextElementSibling.classList.toggle('visible');
+            } else if (actionButton) {
+                const action = actionButton.dataset.action;
+                if (action === 'edit') {
+                    window.top.location.hash = `#publier?edit=${postId}`;
+                } else if (action === 'delete') {
+                    if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
+                        await supabaseClient.from('posts').delete().eq('id', postId);
+                    }
+                }
+            } else if (commentLink) {
+                window.top.location.hash = commentLink.getAttribute('href').substring(1);
             }
-            currentPage = page;
-
-        } catch (error) {
-            console.warn("Erreur de chargement des posts:", error);
-        } finally {
-            isLoading = false;
-            const scrollLoader = document.getElementById('scroll-loader');
-            if (scrollLoader) scrollLoader.remove();
-            if (!hasMorePosts && allPosts.length > 0 && !document.querySelector('.end-of-feed')) {
-                const endMessage = document.createElement('div');
-                endMessage.className = 'end-of-feed';
-                endMessage.textContent = 'Vous avez vu toutes les publications.';
-                postsFeed.appendChild(endMessage);
-            }
-        }
-    };
-
-    const renderPosts = (posts) => {
-        if (!posts || posts.length === 0) {
-            postsFeed.innerHTML = '<div class="loading-message">Aucune publication à afficher pour le moment.</div>';
-            return;
-        }
-        postsFeed.innerHTML = posts.map(post => generatePostHTML(post)).join('');
-    };
-
-    const appendPosts = (posts) => {
-        if (!posts || posts.length === 0) return;
-        const postsHTML = posts.map(post => generatePostHTML(post)).join('');
-        postsFeed.insertAdjacentHTML('beforeend', postsHTML);
-    };
-
-    const generatePostHTML = (post) => {
-        const isAdmin = currentUserProfile && currentUserProfile.role === 'admin';
-        const canModify = isAdmin;
+        });
         
-        const imageUrls = post.post_images?.map(img => img.image_url).filter(Boolean) || [];
-        const whatsappNumbers = post.post_whatsapp_numbers?.map(wp => wp.whatsapp_number).filter(Boolean) || [];
-        const customLinks = post.post_custom_links?.filter(link => link.title && link.url) || [];
-        
-        return `
-        <div class="post-card" data-post-id="${post.id}">
-            <div class="post-header">
-                <div class="post-author-info">
-                    <span class="post-author">${post.profiles?.email || 'Utilisateur supprimé'}</span>
-                    <small class="post-timestamp">${formatDate(post.created_at)}</small>
-                </div>
-                ${canModify ? `
-                <div class="post-menu">
-                    <button class="post-menu-button" data-action="toggle-menu" title="Options">...</button>
-                    <ul class="post-menu-dropdown">
-                        <li><button data-action="edit">Modifier</button></li>
-                        <li><button data-action="delete" class="delete-action">Supprimer</button></li>
-                    </ul>
-                </div>` : ''}
-            </div>
-            <div class="post-content">
-                ${post.content ? `<p>${post.content}</p>` : ''}
-                <div class="post-media-grid">
-                    ${imageUrls.map(url => `<img src="${url}" alt="Image">`).join('')}
-                    ${post.media_url ? `<img src="${post.media_url}" alt="Média">` : ''}
-                </div>
-                <div class="post-links-container">
-                    ${whatsappNumbers.map(num => `<a href="https://wa.me/${num.replace(/\D/g, '')}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
-                    ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
-                    ${customLinks.map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
-                </div>
-            </div>
-            <div class="post-interactions">
-            ${currentUser ? `
-                <div class="post-actions">
-                    <button class="action-btn" data-action="react" data-reaction="like" title="J'aime">👍</button>
-                    <button class="action-btn" data-action="react" data-reaction="love" title="J'adore">❤️</button>
-                    <button class="action-btn" data-action="react" data-reaction="laugh" title="Haha">🤣</button>
-                    <button class="action-btn" data-action="react" data-reaction="angry" title="Grrr">😡</button>
-                </div>
-                <div class="comments-section">
-                    <form class="comment-form" data-post-id="${post.id}"><input type="text" placeholder="Ajouter un commentaire..." required></form>
-                </div>` : `<p class="login-prompt"><a href="index.html">Connectez-vous</a> pour réagir ou commenter.</p>`}
-            </div>
-        </div>
-        `;
-    };
-
-    const reloadAllPosts = async () => {
-        currentPage = 0;
-        hasMorePosts = true;
-        allPosts = [];
-        await fetchPosts(0, false);
-    };
-
-    let scrollTimeout;
-    const debouncedScroll = () => {
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-            const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-            if (scrollHeight - scrollTop - clientHeight < 500 && hasMorePosts && !isLoading) {
-                fetchPosts(currentPage + 1, true);
-            }
-        }, 100);
-    };
-
-    // --- Écouteurs d'événements ---
-    window.addEventListener('scroll', debouncedScroll);
-    postsFeed.addEventListener('click', async (e) => {
-        const button = e.target.closest('button');
-        if (!button) return;
-        const action = button.dataset.action;
-        const postCard = button.closest('.post-card');
-        const postId = postCard ? postCard.dataset.postId : null;
-        if (action === 'toggle-menu') {
-            document.querySelectorAll('.post-menu-dropdown.visible').forEach(menu => {
-                if (menu !== button.nextElementSibling) menu.classList.remove('visible');
-            });
-            button.nextElementSibling.classList.toggle('visible');
-        } else if (action === 'edit') {
-            window.location.hash = `#publier?edit=${postId}`;
-        } else if (action === 'delete') {
-            if (confirm('Voulez-vous vraiment supprimer cette publication ?')) {
-                await supabaseClient.from('posts').delete().eq('id', postId);
-            }
-        } else if (action === 'react') {
-            const reaction = button.dataset.reaction;
-            await supabaseClient.from('reactions').upsert({ post_id: postId, user_id: currentUser.id, reaction_type: reaction });
-        }
-    });
-    postsFeed.addEventListener('submit', async (e) => {
-        if (!e.target.classList.contains('comment-form')) return;
-        e.preventDefault();
-        const input = e.target.querySelector('input');
-        const content = input.value.trim();
-        if (!content) return;
-        await supabaseClient.from('comments').insert({ post_id: e.target.dataset.postId, user_id: currentUser.id, content: content });
-        input.value = '';
-    });
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.post-menu')) {
-            document.querySelectorAll('.post-menu-dropdown.visible').forEach(menu => menu.classList.remove('visible'));
-        }
-    });
-
-    // --- Chargement initial et temps réel ---
-    await fetchPosts(0, false);
-    const channel = supabaseClient.channel('public-db-changes')
-        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-            console.log('Changement détecté, rechargement des posts...', payload);
-            reloadAllPosts();
-        })
-        .subscribe();
-
-</script>
+        await fetchPosts();
+        supabaseClient.channel('db-changes')
+            .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchPosts(searchInput.value.trim()))
+            .subscribe();
+    </script>
+</body>
+</html>
