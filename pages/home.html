@@ -3,21 +3,378 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accueil</title>
+    <title>Accueil - Fil d'actualité</title>
     <style>
-        /* Votre CSS professionnel est conservé */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f7fa;
+            color: #1a202c;
+            line-height: 1.6;
+        }
+
+        .home-container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 16px 80px;
+        }
+
+        .home-header {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+            margin-bottom: 20px;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .home-header svg {
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        #searchInput {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            color: #1a202c;
+        }
+
+        #searchInput::placeholder {
+            color: #94a3b8;
+        }
+
+        .post-card {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+
+        .post-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .post-author-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .post-author {
+            font-weight: 600;
+            color: #1a202c;
+            display: block;
+            font-size: 15px;
+        }
+
+        .post-timestamp {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .post-menu {
+            position: relative;
+        }
+
+        .post-menu-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background 0.2s;
+            color: #64748b;
+        }
+
+        .post-menu-button:hover {
+            background: #f1f5f9;
+        }
+
+        .post-menu-dropdown {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            list-style: none;
+            min-width: 160px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s;
+            z-index: 10;
+        }
+
+        .post-menu-dropdown.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .post-menu-dropdown li {
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .post-menu-dropdown li:last-child {
+            border-bottom: none;
+        }
+
+        .post-menu-dropdown button {
+            width: 100%;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            color: #1a202c;
+            transition: background 0.2s;
+        }
+
+        .post-menu-dropdown button:hover {
+            background: #f8fafc;
+        }
+
+        .delete-action {
+            color: #ef4444 !important;
+        }
+
+        .post-content {
+            padding: 0 16px 16px;
+        }
+
+        .post-content p {
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .post-media-grid {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .post-media-grid:has(img:only-child) {
+            grid-template-columns: 1fr;
+        }
+
+        .post-media-grid:has(img:nth-child(2)) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .post-media-grid:has(img:nth-child(3)) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .post-media-grid:has(img:nth-child(3)) img:first-child {
+            grid-column: 1 / -1;
+        }
+
+        .post-media-grid:has(img:nth-child(4)), 
+        .post-media-grid:has(img:nth-child(n+5)) {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .post-media-grid img {
+            width: 100%;
+            height: 240px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .post-links-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .post-link-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .whatsapp-btn {
+            background: #25D366;
+            color: white;
+        }
+
+        .whatsapp-btn:hover {
+            background: #20BA5A;
+            transform: translateY(-1px);
+        }
+
+        .buy-btn {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .buy-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .post-link-btn:not(.whatsapp-btn):not(.buy-btn) {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .post-link-btn:not(.whatsapp-btn):not(.buy-btn):hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        .post-reactions-bar {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            border-top: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .reaction-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            background: #f8fafc;
+        }
+
+        .reaction-item:hover {
+            background: #f1f5f9;
+            transform: scale(1.05);
+        }
+
+        .reaction-item.user-reacted {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+        }
+
+        .reaction-item span:first-child {
+            font-size: 18px;
+        }
+
+        .reaction-item span:last-child {
+            color: #64748b;
+            font-weight: 500;
+            min-width: 16px;
+        }
+
+        .post-footer {
+            padding: 12px 16px;
+        }
+
+        .comment-button {
+            color: #64748b;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .comment-button:hover {
+            color: #3b82f6;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 640px) {
+            .home-container {
+                padding: 0 0 80px;
+            }
+
+            .home-header {
+                border-radius: 0;
+                margin-bottom: 16px;
+            }
+
+            .post-card {
+                border-radius: 0;
+                margin-bottom: 8px;
+            }
+
+            .post-media-grid img {
+                height: 200px;
+            }
+        }
     </style>
 </head>
 <body>
-
     <div class="home-container">
         <header class="home-header">
             <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24">
                 <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path>
             </svg>
-            <input type="text" id="searchInput" placeholder="Rechercher des articles...">
+            <input type="text" id="searchInput" placeholder="Rechercher des articles..." autocomplete="off">
         </header>
-        <div id="posts-feed"></div>
+        <div id="posts-feed">
+            <div class="loading-spinner">Chargement...</div>
+        </div>
     </div>
 
     <script type="module">
@@ -25,36 +382,56 @@
 
         const postsFeed = document.getElementById('posts-feed');
         const searchInput = document.getElementById('searchInput');
-        if (!postsFeed || !searchInput) throw new Error("Éléments HTML manquants");
 
+        if (!postsFeed || !searchInput) {
+            throw new Error("Éléments HTML manquants");
+        }
+
+        // Récupération de l'utilisateur connecté
         const { data: { user } } = await supabaseClient.auth.getUser();
         const currentUser = user;
-        let currentUserProfile = null; // Initialisé à null
-        
-        // On récupère le profil une seule fois au début
+        let currentUserProfile = null;
+
+        // Chargement du profil utilisateur
         if (currentUser) {
-            const { data: profile, error } = await supabaseClient.from('profiles').select('role').eq('id', currentUser.id).single();
+            const { data: profile, error } = await supabaseClient
+                .from('profiles')
+                .select('role')
+                .eq('id', currentUser.id)
+                .single();
+
             if (error) {
                 console.warn("Impossible de récupérer le profil utilisateur:", error.message);
             } else {
                 currentUserProfile = profile;
             }
         }
-        
+
+        // Fonction de formatage de date
         function formatDate(dateString) {
-             const date = new Date(dateString);
+            const date = new Date(dateString);
             const now = new Date();
             const seconds = Math.round((now - date) / 1000);
-            if (seconds < 60) return `à l'instant`;
+
+            if (seconds < 60) return "à l'instant";
+            
             const minutes = Math.round(seconds / 60);
             if (minutes < 60) return `il y a ${minutes} min`;
+            
             const hours = Math.round(minutes / 60);
             if (hours < 24) return `il y a ${hours} h`;
+            
             const days = Math.round(hours / 24);
             if (days < 7) return `il y a ${days} j`;
-            return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+            
+            return date.toLocaleDateString('fr-FR', { 
+                day: 'numeric', 
+                month: 'short', 
+                year: 'numeric' 
+            });
         }
 
+        // Fonction pour charger les posts
         const fetchPosts = async (searchTerm = '') => {
             let query = supabaseClient
                 .from('posts')
@@ -69,80 +446,143 @@
                 .order('created_at', { ascending: false });
 
             if (searchTerm) {
-                query = query.textSearch('content', `'${searchTerm}'`, { type: 'websearch', config: 'french' });
+                query = query.textSearch('content', `'${searchTerm}'`, { 
+                    type: 'websearch', 
+                    config: 'french' 
+                });
             }
 
             const { data: posts, error } = await query;
-            if (error) { 
-                console.error("Erreur détaillée:", error);
-                postsFeed.innerHTML = "<p>Une erreur est survenue lors du chargement des articles.</p>";
-                return; 
+
+            if (error) {
+                console.error("Erreur lors du chargement des posts:", error);
+                postsFeed.innerHTML = `
+                    <div class="empty-state">
+                        <p>⚠️ Une erreur est survenue lors du chargement des articles.</p>
+                    </div>
+                `;
+                return;
             }
+
             renderPosts(posts);
         };
 
+        // Fonction pour afficher les posts
         const renderPosts = (posts) => {
-            postsFeed.innerHTML = !posts || posts.length === 0
-                ? '<p style="text-align:center; padding: 20px;">Aucun article trouvé.</p>'
-                : posts.map(post => generatePostHTML(post)).join('');
+            if (!posts || posts.length === 0) {
+                postsFeed.innerHTML = `
+                    <div class="empty-state">
+                        <svg fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+                        </svg>
+                        <p>Aucun article trouvé.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            postsFeed.innerHTML = posts.map(post => generatePostHTML(post)).join('');
         };
 
+        // Génération du HTML d'un post
         const generatePostHTML = (post) => {
-            const showAdminMenu = currentUserProfile?.role === 'admin';
-            const authorEmail = post.profiles?.email || 'Anonyme';
+            const isAdmin = currentUserProfile?.role === 'admin';
+            const authorEmail = post.profiles?.email || 'Utilisateur supprimé';
             const avatarInitial = authorEmail.charAt(0).toUpperCase();
 
-            const reactionsCount = (post.reactions || []).reduce((acc, r) => { acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1; return acc; }, {});
-            const userReaction = currentUser ? (post.reactions || []).find(r => r.user_id === currentUser.id)?.reaction_type : null;
+            // Calcul des réactions
+            const reactionsCount = (post.reactions || []).reduce((acc, r) => {
+                acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1;
+                return acc;
+            }, {});
+
+            const userReaction = currentUser 
+                ? (post.reactions || []).find(r => r.user_id === currentUser.id)?.reaction_type 
+                : null;
+
+            // Construction de la grille d'images
+            const allImages = [];
+            if (post.media_url) allImages.push(post.media_url);
+            if (post.post_images) {
+                allImages.push(...post.post_images.map(img => img.image_url));
+            }
+
+            const imagesHTML = allImages.length > 0 
+                ? `<div class="post-media-grid">${allImages.map(url => `<img src="${url}" alt="Image" loading="lazy">`).join('')}</div>`
+                : '';
+
+            // Construction des liens
+            const linksHTML = [];
             
+            if (post.post_whatsapp_numbers && post.post_whatsapp_numbers.length > 0) {
+                post.post_whatsapp_numbers.forEach(wp => {
+                    linksHTML.push(`<a href="https://wa.me/${wp.whatsapp_number}" target="_blank" rel="noopener noreferrer" class="post-link-btn whatsapp-btn">💬 WhatsApp</a>`);
+                });
+            }
+
+            if (post.buy_link) {
+                linksHTML.push(`<a href="${post.buy_link}" target="_blank" rel="noopener noreferrer" class="post-link-btn buy-btn">🛒 Acheter</a>`);
+            }
+
+            if (post.post_custom_links && post.post_custom_links.length > 0) {
+                post.post_custom_links.forEach(link => {
+                    linksHTML.push(`<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="post-link-btn">🔗 ${link.title}</a>`);
+                });
+            }
+
+            const linksContainerHTML = linksHTML.length > 0 
+                ? `<div class="post-links-container">${linksHTML.join('')}</div>`
+                : '';
+
             return `
-            <div class="post-card" data-post-id="${post.id}">
-                <div class="post-header">
-                    <div class="post-author-info">
-                        <div class="avatar">${avatarInitial}</div>
-                        <div>
-                            <span class="post-author">${authorEmail}</span>
-                            <small class="post-timestamp">${formatDate(post.created_at)}</small>
+                <div class="post-card" data-post-id="${post.id}">
+                    <div class="post-header">
+                        <div class="post-author-info">
+                            <div class="avatar">${avatarInitial}</div>
+                            <div>
+                                <span class="post-author">${authorEmail}</span>
+                                <small class="post-timestamp">${formatDate(post.created_at)}</small>
+                            </div>
                         </div>
-                    </div>
-                    ${showAdminMenu ? `
-                    <div class="post-menu">
-                        <button class="post-menu-button" data-action="toggle-menu" title="Options">
-                           <svg fill="currentColor" viewBox="0 0 24 24" width="24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
-                        </button>
-                        <ul class="post-menu-dropdown">
-                            <li><button data-action="edit">Modifier</button></li>
-                            <li><button data-action="delete" class="delete-action">Supprimer</button></li>
-                        </ul>
-                    </div>` : ''}
-                </div>
-                <div class="post-content">
-                    <p>${post.content || ''}</p>
-                    <div class="post-media-grid">
-                        ${(post.media_url ? [`<img src="${post.media_url}" alt="Média">`] : []).concat(
-                            (post.post_images || []).map(img => `<img src="${img.image_url}" alt="Image">`)
-                        ).join('')}
-                    </div>
-                    <div class="post-links-container">
-                         ${(post.post_whatsapp_numbers || []).map(wp => `<a href="https://wa.me/${wp.whatsapp_number}" target="_blank" class="post-link-btn whatsapp-btn">WhatsApp</a>`).join('')}
-                        ${post.buy_link ? `<a href="${post.buy_link}" target="_blank" class="post-link-btn buy-btn">Acheter</a>` : ''}
-                        ${(post.post_custom_links || []).map(link => `<a href="${link.url}" target="_blank" class="post-link-btn">${link.title}</a>`).join('')}
-                    </div>
-                </div>
-                <div class="post-reactions-bar">
-                    ${['👍', '❤️', '🤣', '😡'].map(emoji => `
-                        <div class="reaction-item ${userReaction === emoji ? 'user-reacted' : ''}" data-action="react" data-reaction="${emoji}">
-                            <span>${emoji}</span>
-                            <span>${reactionsCount[emoji] || 0}</span>
+                        ${isAdmin ? `
+                        <div class="post-menu">
+                            <button class="post-menu-button" data-action="toggle-menu" title="Options" aria-label="Options du post">
+                                <svg fill="currentColor" viewBox="0 0 24 24" width="24" height="24">
+                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                                </svg>
+                            </button>
+                            <ul class="post-menu-dropdown">
+                                <li><button data-action="edit">✏️ Modifier</button></li>
+                                <li><button data-action="delete" class="delete-action">🗑️ Supprimer</button></li>
+                            </ul>
                         </div>
-                    `).join('')}
+                        ` : ''}
+                    </div>
+                    <div class="post-content">
+                        ${post.content ? `<p>${post.content}</p>` : ''}
+                        ${imagesHTML}
+                        ${linksContainerHTML}
+                    </div>
+                    <div class="post-reactions-bar">
+                        ${['👍', '❤️', '🤣', '😡'].map(emoji => `
+                            <div class="reaction-item ${userReaction === emoji ? 'user-reacted' : ''}" 
+                                 data-action="react" 
+                                 data-reaction="${emoji}"
+                                 role="button"
+                                 tabindex="0">
+                                <span>${emoji}</span>
+                                <span>${reactionsCount[emoji] || 0}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="post-footer">
+                        <a href="#commentaire?post=${post.id}" class="comment-button">💬 Commentaires</a>
+                    </div>
                 </div>
-                <div class="post-footer">
-                    <a href="#commentaire?post=${post.id}" class="comment-button">Commentaires</a>
-                </div>
-            </div>`;
+            `;
         };
 
+        // Gestion de la recherche avec debounce
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
@@ -151,54 +591,135 @@
             }, 500);
         });
 
+        // Gestion des clics sur les posts
         postsFeed.addEventListener('click', async (e) => {
-            const target = e.target;
-            const reactionItem = target.closest('.reaction-item');
-            const menuButton = target.closest('.post-menu-button');
-            const actionButton = target.closest('.post-menu-dropdown button');
-            const commentLink = target.closest('.comment-button');
+            const target = e.target.closest('[data-action]') || e.target.closest('.comment-button');
+            if (!target) return;
+
             const postCard = target.closest('.post-card');
             const postId = postCard?.dataset.postId;
 
-            if (commentLink) {
+            // Gestion des liens vers les commentaires
+            if (target.classList.contains('comment-button')) {
                 e.preventDefault();
-                window.top.location.hash = commentLink.getAttribute('href').substring(1);
+                window.top.location.hash = target.getAttribute('href').substring(1);
                 return;
             }
-            if (!currentUser) return; // Seuls les utilisateurs connectés peuvent interagir
 
-            if (reactionItem) {
-                const reaction = reactionItem.dataset.reaction;
-                if (reactionItem.classList.contains('user-reacted')) {
-                    await supabaseClient.from('reactions').delete().match({ post_id: postId, user_id: currentUser.id });
+            // Vérification de l'authentification pour les autres actions
+            if (!currentUser) {
+                alert("Vous devez être connecté pour effectuer cette action.");
+                return;
+            }
+
+            const action = target.dataset.action;
+
+            // Gestion des réactions
+            if (action === 'react') {
+                const reaction = target.dataset.reaction;
+                const isReacted = target.classList.contains('user-reacted');
+
+                if (isReacted) {
+                    // Retirer la réaction
+                    const { error } = await supabaseClient
+                        .from('reactions')
+                        .delete()
+                        .match({ post_id: postId, user_id: currentUser.id });
+
+                    if (error) {
+                        console.error("Erreur lors du retrait de la réaction:", error);
+                    }
                 } else {
-                    await supabaseClient.from('reactions').upsert({ post_id: postId, user_id: currentUser.id, reaction_type: reaction });
+                    // Ajouter ou modifier la réaction
+                    const { error } = await supabaseClient
+                        .from('reactions')
+                        .upsert({ 
+                            post_id: postId, 
+                            user_id: currentUser.id, 
+                            reaction_type: reaction 
+                        }, { 
+                            onConflict: 'post_id,user_id' 
+                        });
+
+                    if (error) {
+                        console.error("Erreur lors de l'ajout de la réaction:", error);
+                    }
                 }
-            } else if (menuButton) {
-                menuButton.nextElementSibling.classList.toggle('visible');
-             } else if (actionButton) {
-                const action = actionButton.dataset.action;
-                if (action === 'edit') {
-                    window.top.location.hash = `#publier?edit=${postId}`;
-                } else if (action === 'delete') {
-                    if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
-                        const { error } = await supabaseClient.from('posts').delete().eq('id', postId);
-                        if (error) {
-                            alert("Action non autorisée. Votre rôle ne permet pas cette action.");
-                            console.error(error);
-                        }
+            }
+
+            // Gestion du menu administrateur
+            if (action === 'toggle-menu') {
+                const dropdown = target.nextElementSibling;
+                dropdown.classList.toggle('visible');
+                
+                // Fermer le menu si on clique ailleurs
+                const closeMenu = (event) => {
+                    if (!event.target.closest('.post-menu')) {
+                        dropdown.classList.remove('visible');
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                
+                if (dropdown.classList.contains('visible')) {
+                    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+                }
+            }
+
+            // Gestion de l'édition
+            if (action === 'edit') {
+                window.top.location.hash = `publier?edit=${postId}`;
+            }
+
+            // Gestion de la suppression
+            if (action === 'delete') {
+                if (confirm('⚠️ Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.')) {
+                    const { error } = await supabaseClient
+                        .from('posts')
+                        .delete()
+                        .eq('id', postId);
+
+                    if (error) {
+                        console.error("Erreur lors de la suppression:", error);
+                        alert("❌ Impossible de supprimer cet article. Vérifiez vos permissions.");
+                    } else {
+                        // Retirer visuellement le post
+                        postCard.style.transition = 'opacity 0.3s, transform 0.3s';
+                        postCard.style.opacity = '0';
+                        postCard.style.transform = 'scale(0.95)';
+                        setTimeout(() => postCard.remove(), 300);
                     }
                 }
             }
         });
-        
+
+        // Chargement initial des posts
         await fetchPosts();
-        supabaseClient.channel('db-changes-realtime')
-            .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-                console.log("Changement détecté, mise à jour du fil d'actualité.");
+
+        // Écoute des changements en temps réel
+        const channel = supabaseClient
+            .channel('db-changes-realtime')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public',
+                table: 'posts'
+            }, () => {
+                console.log("📡 Changement détecté, mise à jour du fil d'actualité.");
+                fetchPosts(searchInput.value.trim());
+            })
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public',
+                table: 'reactions'
+            }, () => {
+                console.log("📡 Réaction détectée, mise à jour du fil d'actualité.");
                 fetchPosts(searchInput.value.trim());
             })
             .subscribe();
+
+        // Nettoyage lors du déchargement de la page
+        window.addEventListener('beforeunload', () => {
+            supabaseClient.removeChannel(channel);
+        });
     </script>
 </body>
 </html>
