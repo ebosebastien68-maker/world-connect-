@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Publier</title>
     <style>
-        /* Le design s'adapte au thème de main.html car il est dans un iframe */
         body {
             font-family: var(--font-family, 'Inter', sans-serif);
             background-color: transparent;
@@ -134,7 +133,14 @@
             throw new Error("Utilisateur non connecté");
         }
 
-        let postDraft = { content: "", localFile: null, imageUrls: Array(5).fill(""), whatsappNumbers: Array(3).fill(""), buyLink: "", customLinks: Array(7).fill({ title: "", url: "" }) };
+        let postDraft = { 
+            content: "", 
+            localFile: null, 
+            imageUrls: Array(5).fill(""), 
+            whatsappNumbers: Array(3).fill(""), 
+            buyLink: "", 
+            customLinks: Array(7).fill({ title: "", url: "" }) 
+        };
         let editMode = false;
         let postIdToUpdate = null;
 
@@ -203,16 +209,28 @@
             publishButton.textContent = "Mettre à jour l'Article";
             
             const { data: postToEdit } = await supabaseClient.from('posts').select('*').eq('id', postIdToUpdate).single();
-            const { data: postImages } = await supabaseClient.from('post_images').select('image_url').eq('post_id', postIdToUpdate);
+            const { data: postImages } = await supabaseClient.from('post_images').select('image_url').eq('post_id', postIdToUpdate).order('display_order');
             const { data: postWhatsApp } = await supabaseClient.from('post_whatsapp_numbers').select('whatsapp_number').eq('post_id', postIdToUpdate);
-            const { data: postLinks } = await supabaseClient.from('post_custom_links').select('title, url').eq('post_id', postIdToUpdate);
+            const { data: postLinks } = await supabaseClient.from('post_custom_links').select('title, url, link_type').eq('post_id', postIdToUpdate);
             
             if (postToEdit) {
                 postDraft.content = postToEdit.content || "";
+                
+                // Charger les images externes
                 postDraft.imageUrls = (postImages?.map(img => img.image_url) || []).concat(Array(5).fill("")).slice(0, 5);
+                
+                // Charger les numéros WhatsApp
                 postDraft.whatsappNumbers = (postWhatsApp?.map(wp => wp.whatsapp_number) || []).concat(Array(3).fill("")).slice(0, 3);
-                postDraft.buyLink = postToEdit.buy_link || "";
-                postDraft.customLinks = (postLinks?.map(link => ({title: link.title, url: link.url})) || []).concat(Array(7).fill({title:"",url:""})).slice(0, 7);
+                
+                // Charger le lien d'achat depuis post_custom_links (link_type = 'buy')
+                const buyLinkData = postLinks?.find(link => link.link_type === 'buy');
+                postDraft.buyLink = buyLinkData?.url || "";
+                
+                // Charger les autres liens personnalisés
+                const otherLinks = postLinks?.filter(link => link.link_type !== 'buy') || [];
+                postDraft.customLinks = otherLinks.map(link => ({title: link.title, url: link.url}))
+                    .concat(Array(7).fill({title:"",url:""})).slice(0, 7);
+                
                 updateUIFromDraft();
             }
         }
@@ -231,44 +249,109 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             publishStatus.textContent = editMode ? 'Mise à jour...' : 'Publication...';
+            
             let mediaPublicUrl = null;
 
+            // Upload du média local si présent
             if (postDraft.localFile) {
                 const file = postDraft.localFile;
                 const filePath = `public/${currentUser.id}/${Date.now()}-${file.name}`;
                 const { error: uploadError } = await supabaseClient.storage.from('media').upload(filePath, file);
-                if (uploadError) { publishStatus.textContent = `Erreur d'upload: ${uploadError.message}`; return; }
+                if (uploadError) { 
+                    publishStatus.textContent = `Erreur d'upload: ${uploadError.message}`; 
+                    return; 
+                }
                 mediaPublicUrl = supabaseClient.storage.from('media').getPublicUrl(filePath).data.publicUrl;
             }
 
-            const finalData = { user_id: currentUser.id, content: postDraft.content, buy_link: postDraft.buyLink };
-            if (mediaPublicUrl) { finalData.media_url = mediaPublicUrl; }
+            // V8: posts contient uniquement user_id et content
+            const finalData = { 
+                user_id: currentUser.id, 
+                content: postDraft.content
+            };
             
             let error;
             let postId;
             
             if (editMode) {
+                // Mise à jour du post existant
                 const { error: updateError } = await supabaseClient.from('posts').update(finalData).eq('id', postIdToUpdate);
                 error = updateError;
                 postId = postIdToUpdate;
                 
                 if (!error) {
+                    // Supprimer toutes les données liées existantes
                     await supabaseClient.from('post_images').delete().eq('post_id', postId);
                     await supabaseClient.from('post_whatsapp_numbers').delete().eq('post_id', postId);
                     await supabaseClient.from('post_custom_links').delete().eq('post_id', postId);
                 }
             } else {
+                // Création d'un nouveau post
                 const { data: newPost, error: insertError } = await supabaseClient.from('posts').insert(finalData).select('id').single();
                 error = insertError;
                 postId = newPost?.id;
             }
 
-            if (error) { publishStatus.textContent = `Erreur: ${error.message}`; console.error(error); return; }
+            if (error) { 
+                publishStatus.textContent = `Erreur: ${error.message}`; 
+                console.error(error); 
+                return; 
+            }
 
-            const imageData = postDraft.imageUrls.filter(url => url).map(url => ({ post_id: postId, image_url: url }));
-            const whatsappData = postDraft.whatsappNumbers.filter(num => num).map(num => ({ post_id: postId, whatsapp_number: num }));
-            const linksData = postDraft.customLinks.filter(link => link.url && link.title).map(link => ({ post_id: postId, title: link.title, url: link.url }));
+            // Préparer les données pour les tables de liaison
+            const imageData = [];
+            
+            // Ajouter le média local uploadé comme première image
+            if (mediaPublicUrl) {
+                imageData.push({ 
+                    post_id: postId, 
+                    image_url: mediaPublicUrl, 
+                    display_order: 0 
+                });
+            }
+            
+            // Ajouter les images externes
+            postDraft.imageUrls.filter(url => url).forEach((url, index) => {
+                imageData.push({ 
+                    post_id: postId, 
+                    image_url: url, 
+                    display_order: mediaPublicUrl ? index + 1 : index 
+                });
+            });
 
+            const whatsappData = postDraft.whatsappNumbers
+                .filter(num => num)
+                .map(num => ({ 
+                    post_id: postId, 
+                    whatsapp_number: num,
+                    label: 'WhatsApp'
+                }));
+
+            const linksData = [];
+            
+            // Ajouter le lien d'achat avec link_type = 'buy'
+            if (postDraft.buyLink) {
+                linksData.push({ 
+                    post_id: postId, 
+                    title: 'Acheter', 
+                    url: postDraft.buyLink,
+                    link_type: 'buy'
+                });
+            }
+            
+            // Ajouter les liens personnalisés
+            postDraft.customLinks
+                .filter(link => link.url && link.title)
+                .forEach(link => {
+                    linksData.push({ 
+                        post_id: postId, 
+                        title: link.title, 
+                        url: link.url,
+                        link_type: 'custom'
+                    });
+                });
+
+            // Insérer les données dans les tables de liaison
             const insertPromises = [];
             if (imageData.length > 0) insertPromises.push(supabaseClient.from('post_images').insert(imageData));
             if (whatsappData.length > 0) insertPromises.push(supabaseClient.from('post_whatsapp_numbers').insert(whatsappData));
@@ -279,13 +362,13 @@
                 const hasError = results.some(result => result.error);
                 if (hasError) {
                     publishStatus.textContent = 'Erreur lors de l\'insertion des données liées';
+                    console.error(results.filter(r => r.error));
                     return;
                 }
             }
 
             publishStatus.textContent = editMode ? 'Article mis à jour !' : 'Article publié !';
             setTimeout(() => {
-                // Pour une SPA, on change le hash pour naviguer
                 if (window.top) window.top.location.hash = '#home';
             }, 1500);
         });
