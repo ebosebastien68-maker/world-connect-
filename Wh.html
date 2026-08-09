@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp — Liaison</title>
+<style>
+  :root {
+    --bg: #0e1210;
+    --panel: #161c19;
+    --border: #263029;
+    --text: #e8ede9;
+    --text-dim: #8a9a90;
+    --accent: #25d366;
+    --accent-dim: #1a9e4c;
+    --danger: #e05252;
+    --mono: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s ease;
+  }
+  .dot.ready { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .dot.pending { background: #e0b052; }
+  .dot.error { background: var(--danger); }
+  h1 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .status-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 0 0 22px 19px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: var(--mono);
+    margin-bottom: 14px;
+  }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-dim);
+  }
+  button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  button:not(:disabled):hover { opacity: 0.88; }
+  .btn-primary { background: var(--accent); color: #06210f; }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .pairing-block {
+    display: none;
+    text-align: center;
+    margin: 18px 0;
+    padding: 18px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .pairing-code {
+    font-family: var(--mono);
+    font-size: 26px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    margin: 6px 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .session-block {
+    display: none;
+    margin-top: 18px;
+  }
+  textarea {
+    width: 100%;
+    height: 90px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 10px;
+    border-radius: 8px;
+    resize: none;
+    margin-bottom: 10px;
+  }
+  .copy-btn {
+    background: var(--border);
+    color: var(--text);
+    font-size: 13px;
+    padding: 9px;
+  }
+  .footer-actions {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .error-text {
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 10px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="dot" id="statusDot"></div>
+    <h1>WhatsApp</h1>
+  </div>
+  <p class="status-label" id="statusLabel">Non connecté</p>
+
+  <div id="connectForm">
+    <label for="phoneInput">Numéro (format international, sans +)</label>
+    <input type="text" id="phoneInput" placeholder="22990000000">
+    <button class="btn-primary" id="connectBtn">Connecter WhatsApp</button>
+  </div>
+
+  <div class="pairing-block" id="pairingBlock">
+    <div class="hint">Ouvrez WhatsApp → Appareils liés → Lier avec un numéro de téléphone, puis entrez :</div>
+    <div class="pairing-code" id="pairingCode">----</div>
+    <div class="hint" id="pollingHint">En attente de validation…</div>
+  </div>
+
+  <div class="session-block" id="sessionBlock">
+    <label>Session générée — copiez dans session.data.ts</label>
+    <textarea id="sessionOutput" readonly></textarea>
+    <button class="copy-btn" id="copyBtn">Copier la session</button>
+  </div>
+
+  <div class="error-text" id="errorText"></div>
+
+  <div class="footer-actions" id="footerActions">
+    <button class="btn-danger" id="logoutBtn">Déconnecter</button>
+  </div>
+</div>
+
+<script>
+  const BACKEND_URL = 'https://eueke282zksk1zki18susjdksisk18sj.onrender.com';
+
+  const el = {
+    dot: document.getElementById('statusDot'),
+    statusLabel: document.getElementById('statusLabel'),
+    connectForm: document.getElementById('connectForm'),
+    phoneInput: document.getElementById('phoneInput'),
+    connectBtn: document.getElementById('connectBtn'),
+    pairingBlock: document.getElementById('pairingBlock'),
+    pairingCode: document.getElementById('pairingCode'),
+    pollingHint: document.getElementById('pollingHint'),
+    sessionBlock: document.getElementById('sessionBlock'),
+    sessionOutput: document.getElementById('sessionOutput'),
+    copyBtn: document.getElementById('copyBtn'),
+    errorText: document.getElementById('errorText'),
+    footerActions: document.getElementById('footerActions'),
+    logoutBtn: document.getElementById('logoutBtn'),
+  };
+
+  let pollTimer = null;
+  let sessionAlreadyShown = false;
+
+  async function callApi(action, extra) {
+    const res = await fetch(`${BACKEND_URL}/whatsapp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.success === false) {
+      throw new Error(data.error || 'Erreur inconnue');
+    }
+    return data;
+  }
+
+  function showError(message) {
+    el.errorText.textContent = message;
+    el.errorText.style.display = 'block';
+  }
+
+  function clearError() {
+    el.errorText.style.display = 'none';
+  }
+
+  function renderStatus(data) {
+    el.dot.className = 'dot';
+    if (data.status === 'ready') {
+      el.dot.classList.add('ready');
+      el.statusLabel.textContent = data.phone ? `Connecté — ${data.phone}` : 'Connecté';
+    } else if (data.status === 'auth_failure' || data.status === 'disconnected') {
+      el.dot.classList.add('error');
+      el.statusLabel.textContent = data.status === 'auth_failure' ? 'Échec de liaison' : 'Déconnecté';
+    } else if (data.status === 'idle') {
+      el.statusLabel.textContent = 'Non connecté';
+    } else {
+      el.dot.classList.add('pending');
+      el.statusLabel.textContent = 'Connexion en cours…';
+    }
+
+    el.footerActions.style.display = data.status === 'idle' ? 'none' : 'block';
+    el.connectForm.style.display = data.status === 'idle' ? 'block' : 'none';
+
+    if (data.pairingCode) {
+      el.pairingBlock.style.display = 'block';
+      el.pairingCode.textContent = data.pairingCode;
+    } else if (data.status !== 'ready') {
+      el.pairingBlock.style.display = 'none';
+    }
+
+    if (data.status === 'ready') {
+      el.pairingBlock.style.display = 'none';
+    }
+
+    if (data.status === 'ready' && data.sessionBase64 && !sessionAlreadyShown) {
+      el.sessionBlock.style.display = 'block';
+      el.sessionOutput.value = data.sessionBase64;
+      sessionAlreadyShown = true;
+      stopPolling();
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(async () => {
+      try {
+        const data = await callApi('status');
+        renderStatus(data);
+      } catch (err) {
+        showError(err.message);
+        stopPolling();
+      }
+    }, 3000);
+  }
+
+  function stopPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  el.connectBtn.addEventListener('click', async () => {
+    clearError();
+    const phone = el.phoneInput.value.trim();
+    if (!phone) {
+      showError('Entrez un numéro de téléphone.');
+      return;
+    }
+    el.connectBtn.disabled = true;
+    el.connectBtn.textContent = 'Connexion…';
+    try {
+      const data = await callApi('connect', { phone_number: phone });
+      renderStatus(data);
+      startPolling();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      el.connectBtn.disabled = false;
+      el.connectBtn.textContent = 'Connecter WhatsApp';
+    }
+  });
+
+  el.logoutBtn.addEventListener('click', async () => {
+    clearError();
+    stopPolling();
+    try {
+      const data = await callApi('logout');
+      sessionAlreadyShown = false;
+      el.sessionBlock.style.display = 'none';
+      el.pairingBlock.style.display = 'none';
+      renderStatus(data);
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  el.copyBtn.addEventListener('click', () => {
+    el.sessionOutput.select();
+    navigator.clipboard.writeText(el.sessionOutput.value).then(() => {
+      el.copyBtn.textContent = 'Copié ✓';
+      setTimeout(() => { el.copyBtn.textContent = 'Copier la session'; }, 1500);
+    });
+  });
+
+  // Vérifie l'état au chargement de la page (utile après un refresh)
+  (async () => {
+    try {
+      const data = await callApi('status');
+      renderStatus(data);
+      if (data.status !== 'idle' && data.status !== 'ready') {
+        startPolling();
+      }
+    } catch (err) {
+      // Backend probablement en veille (Render free tier) — pas d'erreur bloquante au chargement
+    }
+  })();
+</script>
+
+</body>
+</html>
